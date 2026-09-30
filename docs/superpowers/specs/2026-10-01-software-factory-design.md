@@ -73,9 +73,11 @@ software-factory/
   AGENTS.md            entry for any harness: you install and operate a factory; start with prompts/doctor.md
   CLAUDE.md            @AGENTS.md (Claude Code reads CLAUDE.md, OpenCode reads AGENTS.md)
   README.md, LICENSE
+  CONTRIBUTING.md      how to change the prompts themselves
   VERSION              semver of the prompts
   CHANGELOG.md         per version: what changed, and a Migration section written as a prompt
   docs/                design documents of the project itself
+  tools/check/         checker of the prompts: links, acceptance ids, schema examples, structure, version
   prompts/
     doctor.md          checks the local environment, creates the private copy
     install.md         runs the installation phases, resumable
@@ -114,8 +116,9 @@ repository.
   apps/factory/        generated TypeScript monorepo
   deploy/              generated Helm chart of the factory
   clusters/<name>/     Flux bootstrap manifests and Kustomizations for deploy/ and infra/
-  infra/               cert-manager, ClusterIssuer, namespaces, .sops.yaml
+  infra/               cert-manager, ClusterIssuer, namespaces
   secrets/             *.sops.yaml, encrypted with age
+  .sops.yaml           sops creation rule for secrets/, with the installation's age recipient
   .github/workflows/   image builds to ghcr, then a commit of the new image tag
   .factory/state.json  installation progress and the prompts version the code was built from
 ```
@@ -123,9 +126,10 @@ repository.
 Rules:
 
 - Path ownership: upstream owns `AGENTS.md`, `CLAUDE.md`, `README.md`,
-  `LICENSE`, `VERSION`, `CHANGELOG.md`, `docs/` and `prompts/`. Everything
-  else belongs to the installation. `git merge upstream/main` therefore never
-  touches generated code.
+  `LICENSE`, `CONTRIBUTING.md`, `.gitignore`, `VERSION`, `CHANGELOG.md`,
+  `docs/`, `prompts/`, `tools/` and `.github/workflows/upstream-ci.yml`.
+  Everything else belongs to the installation. `git merge upstream/main`
+  therefore never touches generated code.
 - The cluster changes only through commits to `main` that Flux applies.
   Direct `kubectl apply` is allowed only while bootstrapping.
 - Generated code is committed in reviewable steps, one component per commit.
