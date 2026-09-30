@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "factory.schema.json",
+  "title": "factory.yaml",
+  "type": "object",
+  "required": ["name", "home", "runtime", "projects"],
+  "additionalProperties": false,
+  "properties": {
+    "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$" },
+    "home": {
+      "type": "object",
+      "required": ["forge", "repo"],
+      "additionalProperties": false,
+      "properties": {
+        "forge": { "const": "github" },
+        "repo": { "type": "string", "pattern": "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$" }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "required": ["server", "ingress", "harness", "limits"],
+      "additionalProperties": false,
+      "properties": {
+        "server": {
+          "type": "object",
+          "required": ["ssh"],
+          "additionalProperties": false,
+          "properties": { "ssh": { "type": "string", "pattern": "^[a-z_][a-z0-9_-]*@(\\d{1,3}\\.){3}\\d{1,3}$" } }
+        },
+        "ingress": {
+          "type": "object",
+          "required": ["host"],
+          "additionalProperties": false,
+          "properties": { "host": { "type": "string", "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$" } }
+        },
+        "harness": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["kind", "models"],
+              "additionalProperties": false,
+              "properties": { "kind": { "const": "claude" }, "models": { "$ref": "#/$defs/models" } }
+            },
+            {
+              "type": "object",
+              "required": ["kind", "provider", "models"],
+              "additionalProperties": false,
+              "properties": {
+                "kind": { "const": "opencode" },
+                "provider": { "const": "openrouter" },
+                "models": { "$ref": "#/$defs/models" }
+              }
+            }
+          ]
+        },
+        "limits": {
+          "type": "object",
+          "required": ["concurrentTurns", "turnDeadlineSeconds", "maxAgentTurns"],
+          "additionalProperties": false,
+          "properties": {
+            "concurrentTurns": { "type": "integer", "minimum": 1, "maximum": 20 },
+            "turnDeadlineSeconds": { "type": "integer", "minimum": 300, "maximum": 14400 },
+            "maxAgentTurns": { "type": "integer", "minimum": 10, "maximum": 500 }
+          }
+        }
+      }
+    },
+    "projects": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/project" } }
+  },
+  "$defs": {
+    "models": {
+      "type": "object",
+      "required": ["work", "review"],
+      "additionalProperties": false,
+      "properties": { "work": { "type": "string", "minLength": 1 }, "review": { "type": "string", "minLength": 1 } }
+    },
+    "binding": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": { "kind": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" } }
+    },
+    "project": {
+      "type": "object",
+      "required": ["name", "forge", "tracker", "channels"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "forge": { "$ref": "#/$defs/binding" },
+        "tracker": { "$ref": "#/$defs/binding" },
+        "channels": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/binding" } }
+      }
+    }
+  }
+}
