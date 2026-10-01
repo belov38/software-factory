@@ -8,13 +8,13 @@ Ask the user for the factory's settings and write them to `factory.yaml`.
 
 - `prompts/spec/factory.schema.json`
 - `.factory/state.json` (`phases.home.repo`)
-- `prompts/integrations/hetzner-ssh.md`
+- `prompts/integrations/server-ssh.md`
 
 ## Steps
 
-1. Server. Ask for the SSH address of the Hetzner server as `user@ipv4`
+1. Server. Ask for the SSH address of the server as `user@ipv4`
    (for example `root@203.0.113.10`). Run the smoke test of
-   `integrations/hetzner-ssh.md`. Refuse and explain when the login fails,
+   `integrations/server-ssh.md`. Refuse and explain when the login fails,
    the OS is not Ubuntu 24.04 or Debian 12, the architecture is not `x86_64`,
    or the address is not a public IPv4 (an IPv6-only server cannot be used in
    this version: GitHub is not reachable over IPv6). Compare CPU, memory and

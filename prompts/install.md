@@ -139,7 +139,7 @@ the script with `--check-only`.
 
 ### Phase server
 
-Uses `integrations/hetzner-ssh.md` and `integrations/k3s.md`. `<ssh>` is
+Uses `integrations/server-ssh.md` and `integrations/k3s.md`. `<ssh>` is
 `runtime.server.ssh`, `<ip>` its address, `<node>` the output of
 `ssh <ssh> hostname` in lower case (k3s names the node after it).
 
@@ -188,9 +188,9 @@ Uses `integrations/hetzner-ssh.md` and `integrations/k3s.md`. `<ssh>` is
 6. Check that the API is closed from outside: `nc -z -w5 <ip> 6443` fails.
 7. Check that port 80 reaches Traefik from outside: within 2 minutes,
    `curl -s -o /dev/null -w '%{http_code}' --max-time 10 http://<ip>/` prints
-   `404`. When it does not, a Hetzner Cloud Firewall or the Robot firewall
-   blocks port 80, or ufw blocks the traffic to Traefik: tell the user what
-   you see and stop. Let's Encrypt needs port 80 in the gitops phase.
+   `404`. When it does not, a firewall in front of the server blocks port 80,
+   or ufw blocks the traffic to Traefik: tell the user what you see and stop.
+   Let's Encrypt needs port 80 in the gitops phase.
 8. Commit `.factory/bin/kube`. Record `k3sVersion`.
 
 ### Phase gitops
