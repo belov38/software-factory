@@ -194,7 +194,11 @@ Uses `integrations/flux.md`, `integrations/sops-age.md` and
 
 ### Phase verify
 
-(Task 12)
+Run `verify.md`. This version has the install checks INSTALL-1 (Flux is
+Ready) and INSTALL-2 (the health endpoint answers over a valid certificate).
+When one fails, use the Pitfalls of the Flux and ingress cards, fix the
+cause by committing, and run `verify.md` again. Record `report:
+verify-report.md`.
 
 ## Done when
 
