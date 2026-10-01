@@ -34,6 +34,19 @@ Tested with: the manifest flow for a personal account with gh 2.86.0 (2026-10-01
 - The user installs the App at `https://github.com/apps/<slug>/installations/new`.
 - A GitHub App cannot be assigned to issues and is not notified of mentions:
   the factory finds mentions in the `issues` and `issue_comment` events.
+- A token can be narrowed when it is created: the body of
+  `POST /app/installations/<id>/access_tokens` takes `repositories` (names)
+  and `permissions` (a subset of the App's). `GET /repos/{owner}/{repo}/installation`
+  (with the JWT) finds the installation of a repository.
+- Webhook deliveries carry `X-Hub-Signature-256: sha256=<hex>`, the
+  HMAC-SHA256 of the raw request body with the webhook secret. Compare it in
+  constant time, before parsing the body. GitHub waits 10 seconds for an
+  answer: answer `202` first and work afterwards.
+- Pushes and pull requests made with an installation token start the
+  repository's workflows, unlike those made with `GITHUB_TOKEN`.
+- `GET /app/hook/deliveries` (with the JWT) lists recent deliveries with
+  `event`, `status_code` and `delivered_at`; `PATCH /app/hook/config`
+  changes the webhook's `url`.
 
 ## Pitfalls
 
@@ -50,4 +63,6 @@ Tested with: the manifest flow for a personal account with gh 2.86.0 (2026-10-01
 ## Smoke test
 
 `node .factory/bin/github-app.mjs --check-only` prints the App id, its slug,
-the installation account and every repository the installation can access.
+the installation account and every repository the installation can access;
+`--deliveries` prints the last 20 webhook deliveries with their event and
+status code.
