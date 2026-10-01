@@ -17,8 +17,8 @@ App; the factory itself arrives in a later version.
 - If your provider has a firewall in front of the server, it allows TCP 22,
   80 and 443.
 - A GitHub account, and the GitHub CLI logged in: `gh auth login`.
-- Claude Code, and either a Claude Pro or Max subscription or an Anthropic API
-  key.
+- Claude Code 2.1.277 or newer, and either a Claude Pro or Max subscription or
+  an Anthropic API key.
 
 ## Install
 
