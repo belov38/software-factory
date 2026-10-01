@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "findings.schema.json",
+  "title": "The final message of a review turn",
+  "type": "object",
+  "required": ["verdict", "summary", "findings"],
+  "additionalProperties": false,
+  "properties": {
+    "verdict": { "enum": ["accepted", "revise", "human"] },
+    "summary": { "type": "string", "minLength": 1 },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["file", "severity", "problem", "fix", "needsHuman"],
+        "additionalProperties": false,
+        "properties": {
+          "file": { "type": "string", "minLength": 1 },
+          "line": { "type": "integer", "minimum": 1 },
+          "severity": { "enum": ["blocker", "major", "minor"] },
+          "problem": { "type": "string", "minLength": 1 },
+          "fix": { "type": "string" },
+          "needsHuman": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

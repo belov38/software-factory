@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "events.schema.json",
+  "title": "Canonical events, from adapters to the core",
+  "oneOf": [
+    { "$ref": "#/$defs/work" },
+    { "$ref": "#/$defs/reviewSubmitted" },
+    { "$ref": "#/$defs/checksFailed" },
+    { "$ref": "#/$defs/changeEnded" }
+  ],
+  "$defs": {
+    "common": {
+      "type": "object",
+      "required": ["type", "deliveryId", "project", "receivedAt"],
+      "properties": {
+        "deliveryId": { "type": "string", "minLength": 1 },
+        "project": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "receivedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "actor": {
+      "type": "object",
+      "required": ["login", "isBot"],
+      "additionalProperties": false,
+      "properties": { "login": { "type": "string" }, "isBot": { "type": "boolean" } }
+    },
+    "ref": {
+      "type": "object",
+      "required": ["kind", "repo", "number"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "github-issue" },
+        "repo": { "type": "string", "pattern": "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$" },
+        "number": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "change": {
+      "type": "object",
+      "required": ["repo", "number", "branch"],
+      "additionalProperties": false,
+      "properties": {
+        "repo": { "type": "string", "pattern": "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$" },
+        "number": { "type": "integer", "minimum": 1 },
+        "branch": { "type": "string", "minLength": 1 }
+      }
+    },
+    "work": {
+      "allOf": [{ "$ref": "#/$defs/common" }],
+      "type": "object",
+      "required": ["ref", "by", "text", "source"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "type": { "enum": ["work.requested", "work.replied", "work.stopped"] },
+        "ref": { "$ref": "#/$defs/ref" },
+        "by": { "$ref": "#/$defs/actor" },
+        "text": { "type": "string" },
+        "source": {
+          "type": "object",
+          "required": ["kind", "id"],
+          "additionalProperties": false,
+          "properties": { "kind": { "enum": ["issue", "comment"] }, "id": { "type": "integer" } }
+        }
+      }
+    },
+    "reviewSubmitted": {
+      "allOf": [{ "$ref": "#/$defs/common" }],
+      "type": "object",
+      "required": ["change", "by", "isBot", "state", "comments", "reviewId"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "type": { "const": "change.review_submitted" },
+        "change": { "$ref": "#/$defs/change" },
+        "by": { "$ref": "#/$defs/actor" },
+        "isBot": { "type": "boolean" },
+        "state": { "enum": ["approved", "changes_requested", "commented"] },
+        "reviewId": { "type": "integer" },
+        "comments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["body"],
+            "additionalProperties": false,
+            "properties": {
+              "path": { "type": "string" },
+              "line": { "type": "integer", "minimum": 1 },
+              "body": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "checksFailed": {
+      "allOf": [{ "$ref": "#/$defs/common" }],
+      "type": "object",
+      "required": ["change", "check", "headSha", "logExcerpt"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "type": { "const": "change.checks_failed" },
+        "change": { "$ref": "#/$defs/change" },
+        "check": {
+          "type": "object",
+          "required": ["name", "id", "url"],
+          "additionalProperties": false,
+          "properties": { "name": { "type": "string" }, "id": { "type": "integer" }, "url": { "type": "string" } }
+        },
+        "headSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "logExcerpt": { "type": "string", "maxLength": 20000 }
+      }
+    },
+    "changeEnded": {
+      "allOf": [{ "$ref": "#/$defs/common" }],
+      "type": "object",
+      "required": ["change"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "type": { "enum": ["change.merged", "change.closed"] },
+        "change": { "$ref": "#/$defs/change" }
+      }
+    }
+  }
+}
