@@ -1,6 +1,6 @@
 # Ingress with the user's domain
 
-Tested with: cert-manager v1.21.2 (chart from https://charts.jetstack.io), Traefik bundled with k3s v1.36.4+k3s1 (2026-10-01), pending the end-to-end run.
+Tested with: cert-manager v1.21.2 (chart from https://charts.jetstack.io), traefik/whoami v1.12.0, Traefik bundled with k3s v1.36.4+k3s1 (2026-10-01), pending the end-to-end run.
 
 ## Facts
 
@@ -12,9 +12,12 @@ Tested with: cert-manager v1.21.2 (chart from https://charts.jetstack.io), Traef
   List, so all of its users share one Let's Encrypt limit; a certificate for
   a bare IP address takes over Traefik's default certificate for the whole
   node, because clients send no SNI for an IP address.
-- cert-manager is installed from the Helm chart `cert-manager`, version
-  `v1.21.2`, repository `https://charts.jetstack.io`, with the values
-  `crds: { enabled: true }`.
+- cert-manager is installed from the Helm chart `cert-manager`, repository
+  `https://charts.jetstack.io`, with the values `crds: { enabled: true }`. The
+  chart version is the tag of the latest release:
+  `gh api repos/cert-manager/cert-manager/releases/latest -q .tag_name`.
+- The placeholder's image is `traefik/whoami` at the tag of its latest
+  release: `gh api repos/traefik/whoami/releases/latest -q .tag_name`.
 - Let's Encrypt validates with HTTP-01 through Traefik: cert-manager creates a
   temporary Ingress for `/.well-known/acme-challenge/` on port 80 and removes
   it when the certificate is issued.
@@ -40,7 +43,7 @@ Tested with: cert-manager v1.21.2 (chart from https://charts.jetstack.io), Traef
     selector: { matchLabels: { app: healthz } }
     template:
       metadata: { labels: { app: healthz } }
-      spec: { containers: [ { name: whoami, image: traefik/whoami:v1.12.0, ports: [ { containerPort: 80 } ] } ] }
+      spec: { containers: [ { name: whoami, image: traefik/whoami:<whoami-version>, ports: [ { containerPort: 80 } ] } ] }
   ---
   apiVersion: v1
   kind: Service

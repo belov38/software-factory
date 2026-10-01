@@ -29,7 +29,7 @@ where it stopped.
 | secrets | below | `ageRecipient` |
 | github-app | below | `appId`, `appSlug` |
 | server | below | `k3sVersion` |
-| gitops | below | `fluxVersion` |
+| gitops | below | `fluxVersion`, `certManagerVersion` |
 | verify | below | `report` |
 
 This version ends after the verify phase with the install checks. The phases
@@ -156,8 +156,8 @@ Uses `integrations/server-ssh.md` and `integrations/k3s.md`. `<ssh>` is
      tables. This phase installs on a fresh server only, and enabling the
      firewall would cut off whatever the server already serves.
 2. Firewall: run the ufw commands from the k3s card over SSH.
-3. k3s: run the install command from the card with the pinned version; check
-   `ssh <ssh> 'k3s --version'`.
+3. k3s: find the current stable version and install it with the commands in
+   the card; check `ssh <ssh> 'k3s --version'`.
 4. Kubeconfig, without printing it:
    `ssh <ssh> 'cat /etc/rancher/k3s/k3s.yaml' > ~/.config/software-factory/<name>.kubeconfig && chmod 600 ~/.config/software-factory/<name>.kubeconfig`,
    then `KUBECONFIG=~/.config/software-factory/<name>.kubeconfig kubectl config set-cluster default --server=https://127.0.0.1:16443`.
@@ -214,13 +214,13 @@ Uses `integrations/flux.md`, `integrations/sops-age.md` and
    (`source.toolkit.fluxcd.io/v1`, namespace `cert-manager`, url
    `https://charts.jetstack.io`, interval `1h`) and a HelmRelease
    `cert-manager` (`helm.toolkit.fluxcd.io/v2`, namespace `cert-manager`,
-   chart `cert-manager` at the version from the ingress card, from that
+   chart `cert-manager` at the latest release (see the ingress card), from that
    HelmRepository, values `crds: { enabled: true }`, interval `1h`).
 5. Write `infra/config/cluster-issuer.yaml` with the ClusterIssuer from the
    ingress card, `email` from `runtime.ingress.email`.
 6. Write `deploy/healthz/` with the placeholder Deployment, Service and
    Ingress from the ingress card, in namespace `factory`, host
-   `runtime.ingress.host`. The factory's controller replaces it later.
+   `runtime.ingress.host`, and the latest `traefik/whoami` tag. The factory's controller replaces it later.
 7. Write the Flux Kustomizations in `clusters/<name>/`. Each one is
    `kustomize.toolkit.fluxcd.io/v1` in namespace `flux-system`, with
    `sourceRef: { kind: GitRepository, name: flux-system }`, `interval: 10m`
@@ -237,7 +237,7 @@ Uses `integrations/flux.md`, `integrations/sops-age.md` and
    shows every row Ready.
 9. Wait until `.factory/bin/kube kubectl -n factory get certificate` shows
    `healthz-tls` Ready.
-10. Record `fluxVersion` (`flux --version`).
+10. Record `fluxVersion` (`flux --version`) and `certManagerVersion`.
 
 ### Phase verify
 

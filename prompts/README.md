@@ -22,6 +22,12 @@ sections, in this order:
 - `## Pitfalls`: what goes wrong and how to avoid it;
 - `## Smoke test`: commands that show the integration works.
 
+Phases install the current stable release of each component and record its
+version in `.factory/state.json`; cards show how to find it. The `Tested
+with:` line names the last version verified with these prompts: when the
+current release fails where that version works, install the tested version
+and tell the user.
+
 ## Acceptance ids
 
 Acceptance ids have the form `<AREA>-<number>`, where the area is INSTALL,

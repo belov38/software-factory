@@ -4,10 +4,12 @@ Tested with: k3s v1.36.4+k3s1 (stable channel on 2026-10-01), pending the end-to
 
 ## Facts
 
-- Install a pinned version as root on the server:
+- Install the current stable release as root on the server. Find its version
+  first (on the user's machine), then install exactly that version:
 
   ```bash
-  curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.36.4+k3s1 sh -s - server --write-kubeconfig-mode 600
+  curl -s https://update.k3s.io/v1-release/channels | jq -r '.data[] | select(.id=="stable") | .latest'
+  curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=<version> sh -s - server --write-kubeconfig-mode 600
   ```
 
   It creates the systemd unit `k3s`, the commands `k3s` and `kubectl`, and
