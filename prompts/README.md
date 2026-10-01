@@ -27,11 +27,10 @@ sections, in this order:
 Acceptance ids have the form `<AREA>-<number>`, where the area is INSTALL,
 CORE, REVIEW, FEEDBACK, ISOLATION or HARNESS. They are defined only in the
 table of `verify.md` and referenced by the prompts whose work they check.
-`tools/check` treats every such id in `prompts/` as a reference, so write
-one only where the prompt relies on that check.
+Every such id in `prompts/` counts as a reference, so write one only where
+the prompt relies on that check.
 
 ## Schema examples
 
 An example that must match a schema is fenced with `yaml schema=<name>` or
-`json schema=<name>`; `tools/check` validates it against
-`prompts/spec/<name>.schema.json`.
+`json schema=<name>` and matches `prompts/spec/<name>.schema.json`.

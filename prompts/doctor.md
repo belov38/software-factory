@@ -26,31 +26,29 @@ turn this clone into the user's private factory repository.
    | sops | `sops --version` | `brew install sops` | a release binary from https://github.com/getsops/sops/releases |
    | age | `age --version` | `brew install age` | `sudo apt-get install -y age` |
    | node 22+ | `node --version` | `brew install node` | https://github.com/nodesource/distributions |
-   | pnpm | `pnpm --version` | `brew install pnpm` | `sudo npm install -g pnpm` |
    | jq | `jq --version` | `brew install jq` | `sudo apt-get install -y jq` |
    | curl | `curl --version` | built in | `sudo apt-get install -y curl` |
    | dig | `dig -v` | built in | `sudo apt-get install -y dnsutils` |
    | nc | `command -v nc` | built in | `sudo apt-get install -y netcat-openbsd` |
 
    Ask the user before installing, then install with the commands above.
-3. Install the checker's dependencies: `pnpm --dir tools/check install --frozen-lockfile`.
-4. Check GitHub access: `gh auth status` shows a logged-in account whose token
+3. Check GitHub access: `gh auth status` shows a logged-in account whose token
    scopes include `repo` and `workflow`. When not, ask the user to run
    `gh auth login --scopes repo,workflow` (or `gh auth refresh --scopes repo,workflow`)
    and wait. Then run `gh auth setup-git`, so that `git push` over HTTPS uses
    the same login.
-5. When `.factory/state.json` records `phases.home`, skip to step 8.
+4. When `.factory/state.json` records `phases.home`, skip to step 7.
    Otherwise ask the user who owns the factory repository (their account or
    an organisation they administer) and its name (default
    `<owner>-factory` in lower case; allowed characters `A-Z a-z 0-9 . _ -`;
    never the name of the upstream repository). Check the
    owner type: `gh api users/<owner> -q .type` prints `User` or
    `Organization`.
-6. When `gh repo view <owner>/<name>` succeeds, the repository exists: ask
+5. When `gh repo view <owner>/<name>` succeeds, the repository exists: ask
    whether it is this factory (an earlier, interrupted run created it; then
-   continue with step 7) or another name should be used. Do not push into an
+   continue with step 6) or another name should be used. Do not push into an
    existing repository that is not this factory.
-7. Create the private copy and point the remotes at it. Every line is safe to
+6. Create the private copy and point the remotes at it. Every line is safe to
    run again after an interruption:
 
    ```bash
@@ -60,7 +58,7 @@ turn this clone into the user's private factory repository.
    if [ -z "$(git ls-remote origin main)" ]; then git push origin main; else git pull --rebase origin main; fi
    ```
 
-8. Write `.factory/state.json` (times in UTC from `date -u +%Y-%m-%dT%H:%M:%SZ`,
+7. Write `.factory/state.json` (times in UTC from `date -u +%Y-%m-%dT%H:%M:%SZ`,
    the version from `VERSION`), for example:
 
    ```json schema=state
@@ -68,21 +66,23 @@ turn this clone into the user's private factory repository.
      "promptsVersion": "0.1.0-alpha.1",
      "phases": {
        "doctor": { "done": "2026-10-01T10:00:00Z" },
-       "home": { "done": "2026-10-01T10:02:00Z", "repo": "acme/software-factory", "ownerType": "User" }
+       "home": { "done": "2026-10-01T10:02:00Z", "repo": "acme/acme-factory", "ownerType": "User" }
      }
    }
    ```
 
-   Validate, commit and push:
+   Check it against `prompts/spec/state.schema.json`: read the schema and confirm that every required key is present, every value
+   has the type and pattern the schema gives, and no key appears that the
+   schema does not allow.
+   Then commit and push:
 
    ```bash
-   pnpm --dir tools/check validate state .factory/state.json
    git add .factory/state.json
    git commit -m "Start the factory installation"
    git push origin main
    ```
 
-9. Continue with `install.md`.
+8. Continue with `install.md`.
 
 ## Done when
 
@@ -92,8 +92,8 @@ turn this clone into the user's private factory repository.
 - `git remote get-url origin` is the private repository and
   `git remote get-url upstream` is the public one.
 - `gh repo view <owner>/<name> --json visibility -q .visibility` prints `PRIVATE`.
-- `pnpm --dir tools/check validate state .factory/state.json` passes and the
-  file is pushed.
+- `.factory/state.json` matches `prompts/spec/state.schema.json` and is
+  pushed.
 
 ## Never
 

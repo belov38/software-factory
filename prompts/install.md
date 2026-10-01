@@ -16,8 +16,8 @@ where it stopped.
 1. Read `.factory/state.json`. Run the phases below in order, skipping every
    phase whose `done` is set.
 2. After each phase, add it to `.factory/state.json` with `done` (UTC,
-   `date -u +%Y-%m-%dT%H:%M:%SZ`) and the outputs in the table, validate with
-   `pnpm --dir tools/check validate state .factory/state.json`, commit and push.
+   `date -u +%Y-%m-%dT%H:%M:%SZ`) and the outputs in the table, check it
+   against `prompts/spec/state.schema.json` as in `doctor.md`, commit and push.
 3. When a phase fails, record nothing for it, tell the user what failed and
    what you tried, and stop. Running `install.md` again resumes here.
 

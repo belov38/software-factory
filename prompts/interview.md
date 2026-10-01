@@ -67,16 +67,18 @@ Ask the user for the factory's settings and write them to `factory.yaml`.
        channels: [ { kind: github-comments } ]
    ```
 
-   Validate, commit and push:
+   Check it against `prompts/spec/factory.schema.json`: read the schema and confirm that every required key is present, every value
+   has the type and pattern the schema gives, and no key appears that the
+   schema does not allow.
+   Then commit and push:
 
    ```bash
-   pnpm --dir tools/check validate factory factory.yaml
    git add factory.yaml && git commit -m "Record the factory settings" && git push origin main
    ```
 
 ## Done when
 
-- `pnpm --dir tools/check validate factory factory.yaml` passes.
+- `factory.yaml` matches `prompts/spec/factory.schema.json`.
 - The server smoke test passed and the host resolves to the server's IPv4.
 - Every project repository exists.
 

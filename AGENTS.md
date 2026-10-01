@@ -32,8 +32,7 @@ prompts under `prompts/` tell you, the coding agent reading this, how to do it.
    say so.
 5. In an installation, do not edit the upstream-owned paths: `AGENTS.md`,
    `CLAUDE.md`, `README.md`, `LICENSE`, `CONTRIBUTING.md`, `.gitignore`,
-   `VERSION`, `CHANGELOG.md`, `docs/`, `prompts/`, `tools/`,
-   `.github/workflows/upstream-ci.yml`. They change only by merging
+   `VERSION`, `CHANGELOG.md`, `docs/`, `prompts/`. They change only by merging
    `upstream/main`.
 6. When a step needs the human (a click, a secret, a decision), say exactly
    what to do and wait for their answer.
