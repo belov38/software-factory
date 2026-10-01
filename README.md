@@ -9,7 +9,8 @@ merge.
 ## Install a factory
 
 You need a Hetzner server with your SSH key (Ubuntu 24.04 or Debian 12,
-public IPv4), a GitHub account and a key for Claude or OpenRouter. Then:
+public IPv4), a domain where you can add a DNS record, a GitHub account and a
+key for Claude or OpenRouter. Then:
 
 ```bash
 git clone https://github.com/belov38/software-factory.git

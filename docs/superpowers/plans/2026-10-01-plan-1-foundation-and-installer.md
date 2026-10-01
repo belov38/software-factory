@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A person runs their coding agent in a clone of this repository and ends with a private factory repository, `factory.yaml`, encrypted secrets, a GitHub App, k3s on their Hetzner server, Flux syncing from the private repository and a valid certificate on `<ip>.sslip.io` — proven by the acceptance checks INSTALL-1 and INSTALL-2.
+**Goal:** A person runs their coding agent in a clone of this repository and ends with a private factory repository, `factory.yaml`, encrypted secrets, a GitHub App, k3s on their Hetzner server, Flux syncing from the private repository and a valid certificate for a host in the user's domain — proven by the acceptance checks INSTALL-1 and INSTALL-2.
 
 **Architecture:** The upstream repository holds prompts plus a small TypeScript checker (`tools/check`) that keeps them consistent: relative links, acceptance ids, JSON-schema examples, prompt structure, version. Installer prompts are phase files with fixed sections; integration cards hold tested facts about each external system. The prompts themselves are tested by running the installer end to end on a real server.
 
@@ -10,9 +10,11 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-01-software-factory-design.md`
 
+**Amended 2026-10-01, after Task 5:** a host in the user's own domain replaces `<ip>.sslip.io` (spec decision 9 and "Check results (Plan 1, 2026-10-01)"), and `factory.yaml` gains `runtime.ingress.email` for the Let's Encrypt account. Task 6 is reduced to check 3, which needs no server; check 6 moves to Plan 2; checks 4 and 5 are covered by the end-to-end run in Task 13. Tasks 1-5 are unchanged below and record what was done.
+
 **Plans in this series:**
-1. This plan: foundation, pre-writing checks 3-6, installer phases doctor → gitops, INSTALL-1 and INSTALL-2 against a placeholder health endpoint.
-2. The factory: spec prompts (architecture, core, capabilities, ports), runtime integration cards, checks 1, 2, 7 and 8, phases build and deploy, the remaining acceptance checks.
+1. This plan: foundation, pre-writing check 3, installer phases doctor → gitops, INSTALL-1 and INSTALL-2 against a placeholder health endpoint; the end-to-end run covers checks 4 and 5.
+2. The factory: spec prompts (architecture, core, capabilities, ports), runtime integration cards, checks 1, 2, 6, 7 and 8, phases build and deploy, the remaining acceptance checks.
 3. Operation: `operate/*` prompts, upgrades through `CHANGELOG.md` migrations, HARNESS-1 with both runtime agents, release 0.1.0.
 
 ## Global Constraints
@@ -22,7 +24,7 @@
 - Secrets rule, verbatim from the spec: "the harness works with paths to secret files, never with their values. It does not print env files or put values on command lines."
 - The Kubernetes API is reached only through an SSH tunnel; the server's firewall allows 22, 80 and 443 only.
 - The cluster changes only through commits to `main` that Flux applies; direct `kubectl apply` is allowed only while bootstrapping.
-- Default ingress host: `<server-ip>.sslip.io`; v1 needs a public IPv4.
+- Ingress host: a name in the user's domain with an A record to the server's public IPv4 (v1 needs a public IPv4: GitHub is not reachable over IPv6); the user's email registers the Let's Encrypt account.
 - Everything written into the repository is in English.
 - Commit messages are plain sentences without a type prefix and without any session trailer or link.
 - Commands run from the repository root `~/prj-other/software-factory` unless a step says otherwise.
@@ -33,7 +35,7 @@
 2. **A secret reaching the agent's transcript.** The agent prints the env file or passes a value on a command line. Test: Task 13, step 2 (canary value) and step 7 (grep the transcript).
 3. **A server that is not fresh.** k3s, another web server on 80/443 or an unknown firewall already exists. Expected: the server phase stops and asks instead of overwriting. Test: Task 11, step 1 (the preflight in the phase) and Task 13, step 6.
 4. **An organisation instead of a personal account.** The App creation URL and `flux bootstrap --personal` differ. Test: Task 10 covers both URLs in the helper; Task 13, step 8 repeats the github-app phase with an organisation when the user has one.
-5. **A server without a public IPv4.** sslip needs an address that Let's Encrypt can reach over IPv4 in v1. Expected: the interview refuses and explains. Test: Task 13, step 3 (enter an IPv6-only address first).
+5. **A host that does not point at the server.** The A record is missing, still propagating or points elsewhere. Expected: the interview waits until `dig +short <host>` prints the server's IPv4 and writes `factory.yaml` only then, so no certificate is requested for a wrong address. Test: Task 13, step 3 (give the host before creating the record).
 
 ---
 
@@ -1059,106 +1061,20 @@ git commit -m "Add the entry point for coding agents, the prompt conventions and
 
 ---
 
-### Task 6: Pre-writing checks 3-6 on a test server
+### Task 6: Pre-writing check 3: the GitHub App manifest flow
 
-Spec section "Checks before writing prompts", items 3, 4, 5 and 6. Their results decide the content of the cards in Tasks 7 and 10.
+Spec section "Checks before writing prompts", item 3; its result decides the github-app phase in Task 10. Check 4 is shown by INSTALL-2 and check 5 is measured in the end-to-end run (Task 13); check 6 moves to Plan 2. The findings about wildcard DNS hostnames and conditional requests are already in the spec's "Check results (Plan 1, 2026-10-01)".
 
 **Files:**
-- Modify: `docs/superpowers/specs/2026-10-01-software-factory-design.md` (new section "Check results (Plan 1)")
+- Modify: `docs/superpowers/specs/2026-10-01-software-factory-design.md` (section "Check results (Plan 1, 2026-10-01)")
 - Create: scratch files only, outside the repository.
 
 **Interfaces:**
-- Produces: tested versions of k3s, Flux, cert-manager, sops and age; the recommended server size; whether a `127.0.0.1` redirect works in the manifest flow; whether Let's Encrypt issues for `<ip>.sslip.io`; whether k3s enforces the egress rules.
+- Produces: whether a `127.0.0.1` redirect works in the manifest flow, what the conversion returns, and the `gh` version for the GitHub App card.
 
-- [ ] **Step 1: Get a test server and tools**
+- [ ] **Step 1: Run the manifest flow with a `127.0.0.1` redirect**
 
-Ask the user for a disposable Hetzner server (CX22 or larger, Ubuntu 24.04, public IPv4, their SSH key) and its address `root@<ip>`. Install the local tools: `brew install sops age fluxcd/tap/flux` (macOS). Record `k3s`, `flux`, `sops` and `age` versions as you go.
-
-- [ ] **Step 2: Check 6 and 5 — k3s, NetworkPolicy, footprint**
-
-```bash
-S=root@<ip>
-ssh $S 'curl -sfL https://get.k3s.io | sh -s - server --write-kubeconfig-mode 600 && k3s --version'
-ssh $S 'kubectl run probe --image=curlimages/curl --restart=Never --command -- sleep 3600 && kubectl wait --for=condition=Ready pod/probe --timeout=120s'
-ssh $S 'kubectl exec probe -- curl -s -m5 http://169.254.169.254/hetzner/v1/metadata/hostname; echo " exit=$?"'
-```
-
-Expected: the metadata hostname prints (reachable without a policy).
-
-```bash
-ssh $S 'kubectl label pod probe role=turn && cat <<EOF | kubectl apply -f -
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata: { name: turn-egress }
-spec:
-  podSelector: { matchLabels: { role: turn } }
-  policyTypes: [Egress]
-  egress:
-    - to: [ { namespaceSelector: {}, podSelector: { matchLabels: { k8s-app: kube-dns } } } ]
-      ports: [ { protocol: UDP, port: 53 }, { protocol: TCP, port: 53 } ]
-    - to: [ { ipBlock: { cidr: 0.0.0.0/0, except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16] } } ]
-      ports: [ { protocol: TCP, port: 443 } ]
-EOF'
-sleep 10
-ssh $S 'kubectl exec probe -- curl -s -m5 http://169.254.169.254/hetzner/v1/metadata/hostname; echo " metadata exit=$?"'
-ssh $S 'kubectl exec probe -- curl -s -m5 -o /dev/null -w "%{http_code}" https://api.github.com; echo " github exit=$?"'
-ssh $S 'kubectl exec probe -- curl -sk -m5 https://10.43.0.1; echo " kube-api exit=$?"'
-ssh $S 'free -m; kubectl top node 2>/dev/null || true'
-```
-
-Expected: metadata exit non-zero (blocked), github `200` exit 0, kube-api exit non-zero. Record the memory in use after k3s alone.
-
-- [ ] **Step 3: Check 4 — Let's Encrypt for `<ip>.sslip.io`**
-
-```bash
-ssh $S 'kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml && kubectl -n cert-manager wait --for=condition=Available deploy --all --timeout=300s'
-ssh $S "cat <<EOF | kubectl apply -f -
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata: { name: letsencrypt }
-spec:
-  acme:
-    server: https://acme-v02.api.letsencrypt.org/directory
-    privateKeySecretRef: { name: letsencrypt-account }
-    solvers: [ { http01: { ingress: { ingressClassName: traefik } } } ]
----
-apiVersion: apps/v1
-kind: Deployment
-metadata: { name: healthz }
-spec:
-  selector: { matchLabels: { app: healthz } }
-  template:
-    metadata: { labels: { app: healthz } }
-    spec: { containers: [ { name: whoami, image: traefik/whoami:v1.10, ports: [ { containerPort: 80 } ] } ] }
----
-apiVersion: v1
-kind: Service
-metadata: { name: healthz }
-spec: { selector: { app: healthz }, ports: [ { port: 80 } ] }
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: healthz
-  annotations: { cert-manager.io/cluster-issuer: letsencrypt }
-spec:
-  ingressClassName: traefik
-  tls: [ { hosts: [ <ip>.sslip.io ], secretName: healthz-tls } ]
-  rules:
-    - host: <ip>.sslip.io
-      http: { paths: [ { path: /healthz, pathType: Prefix, backend: { service: { name: healthz, port: { number: 80 } } } } ] }
-EOF"
-ssh $S 'kubectl wait --for=condition=Ready certificate/healthz-tls --timeout=300s'
-curl -fsS --max-time 10 https://<ip>.sslip.io/healthz | head -3
-curl -s https://publicsuffix.org/list/public_suffix_list.dat | grep -n sslip
-ssh $S 'free -m'
-```
-
-Expected: the certificate becomes Ready, `curl` without `-k` succeeds, and the grep shows whether `sslip.io` is on the Public Suffix List (on the list: each `<ip>.sslip.io` counts as its own registered domain for Let's Encrypt rate limits). Record the memory after cert-manager.
-
-- [ ] **Step 4: Check 3 — manifest flow with a `127.0.0.1` redirect**
-
-Write `/tmp/sf-manifest-check.mjs`:
+Write `/tmp/sf-manifest-check.mjs` (or the same file in the session's scratch directory):
 
 ```js
 import { createServer } from 'node:http'
@@ -1196,24 +1112,19 @@ createServer(async (req, res) => {
 }).listen(8765, '127.0.0.1', () => console.log('open http://127.0.0.1:8765/'))
 ```
 
+
 Run: `node /tmp/sf-manifest-check.mjs`, ask the user to open the printed URL and click "Create GitHub App".
 Expected: `{"status":201,"id":…,"slug":"sf-check-…","hasPem":true,"hasWebhookSecret":true}`. Then ask the user to delete the test App from the link in the browser.
 
-- [ ] **Step 5: Record the results and reset the server**
+- [ ] **Step 2: Record the result**
 
-Add to the spec, after "Checks before writing prompts", a section `### Check results (Plan 1, <date>)` with one numbered paragraph per check (3, 4, 5, 6): what ran, the observed result, the versions, and any change to the design. Write the recommended server size from check 5 as: the memory in use after k3s and cert-manager, plus 4 GiB for one turn, rounded up to a Hetzner server type.
+Add a paragraph for check 3 to the spec's "Check results (Plan 1, 2026-10-01)": what ran, the observed result, the `gh` version, and any change to the design. If the redirect to `127.0.0.1` is refused, stop and discuss the change with the user before Task 7.
 
-```bash
-ssh $S '/usr/local/bin/k3s-uninstall.sh'
-```
-
-If a result contradicts the design (for example the redirect to `127.0.0.1` is refused), stop and discuss the change with the user before Task 7.
-
-- [ ] **Step 6: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
 git add docs/superpowers/specs/2026-10-01-software-factory-design.md
-git commit -m "Record the results of the pre-writing checks for the installer"
+git commit -m "Record the result of the manifest flow check"
 ```
 
 ---
@@ -1221,25 +1132,25 @@ git commit -m "Record the results of the pre-writing checks for the installer"
 ### Task 7: Integration cards for the server and the cluster
 
 **Files:**
-- Create: `prompts/integrations/hetzner-ssh.md`, `prompts/integrations/k3s.md`, `prompts/integrations/sops-age.md`, `prompts/integrations/flux.md`, `prompts/integrations/ingress-sslip.md`
+- Create: `prompts/integrations/hetzner-ssh.md`, `prompts/integrations/k3s.md`, `prompts/integrations/sops-age.md`, `prompts/integrations/flux.md`, `prompts/integrations/ingress.md`
 
 **Interfaces:**
-- Consumes: the check results and versions from Task 6.
-- Produces: facts the phase prompts cite by file name: the pinned k3s version (`k3s.md`), the recommended server size (`hetzner-ssh.md`), the ufw rules, the Flux bootstrap command, the sops encrypt command, the ClusterIssuer and placeholder manifests (`ingress-sslip.md`).
+- Consumes: the current stable versions of k3s, Flux, cert-manager, sops and age (sops 3.13.3, age 1.3.2 and the Flux CLI 2.9.5 are installed locally); the spec's Check results. Task 13 confirms the versions on a real server.
+- Produces: facts the phase prompts cite by file name: the pinned k3s version (`k3s.md`), the recommended server size (`hetzner-ssh.md`), the ufw rules, the Flux bootstrap command, the sops encrypt command, the ClusterIssuer and placeholder manifests (`ingress.md`).
 
 - [ ] **Step 1: Write the cards**
 
-Each card follows `prompts/README.md`. Use the versions and results recorded in Task 6 for every `Tested with:` line and every value marked "(from Task 6)".
+Each card follows `prompts/README.md`. A value marked "(current)" is the current stable release on the day the card is written: k3s from `https://update.k3s.io/v1-release/channels` (channel `stable`), Flux, cert-manager, sops and age from their latest GitHub releases. Until Task 13 passes, a `Tested with:` line names these versions and adds "pending the end-to-end run"; Task 13 replaces it with the versions and date of the passing run.
 
 `prompts/integrations/hetzner-ssh.md` must contain:
-- `Tested with:` Ubuntu 24.04 on the server type used in Task 6, and the date.
-- Facts: the recommended server type and why (from Task 6); root login with the SSH key given at creation; the metadata service at `http://169.254.169.254/hetzner/v1/metadata`, reachable from the server and, without a policy, from pods; a public IPv4 is included unless the server was created IPv6-only; an attached Hetzner Cloud Firewall, if any, must allow 22, 80 and 443.
-- Pitfalls: IPv6-only servers are refused in v1; an existing web server on 80/443 blocks Traefik; a rebuilt server gets a new host key (`ssh-keygen -R <ip>`).
+- `Tested with:` Ubuntu 24.04, pending the end-to-end run.
+- Facts: the recommended server type: CX22 (2 vCPU, 4 GB) or larger until Task 13 measures k3s, Flux and cert-manager; root login with the SSH key given at creation; the metadata service at `http://169.254.169.254/hetzner/v1/metadata`, reachable from the server and, without a policy, from pods; a public IPv4 is included unless the server was created IPv6-only; an attached Hetzner Cloud Firewall, if any, must allow 22, 80 and 443.
+- Pitfalls: IPv6-only servers are refused in v1 (GitHub is not reachable over IPv6); an existing web server on 80/443 blocks Traefik; a rebuilt server gets a new host key (`ssh-keygen -R <ip>`).
 - Smoke test: `ssh -o BatchMode=yes -o ConnectTimeout=10 <user>@<ip> 'cat /etc/os-release; nproc; free -m; df -h /'`.
 
 `prompts/integrations/k3s.md` must contain:
-- `Tested with:` the k3s version (from Task 6) and the date.
-- Facts: the install command `curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=<version> sh -s - server --write-kubeconfig-mode 600`; bundled Traefik with ingress class `traefik`; ServiceLB publishes 80 and 443 on the node; kubeconfig at `/etc/rancher/k3s/k3s.yaml` pointing at `https://127.0.0.1:6443`; pod CIDR `10.42.0.0/16`, service CIDR `10.43.0.0/16`; the embedded network policy controller enforces the egress rule shown in Task 6 (quote it); `local-path` is the default storage class; uninstall with `/usr/local/bin/k3s-uninstall.sh`.
+- `Tested with:` the k3s version (current) and the date.
+- Facts: the install command `curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=<version> sh -s - server --write-kubeconfig-mode 600`; bundled Traefik with ingress class `traefik`; ServiceLB publishes 80 and 443 on the node; kubeconfig at `/etc/rancher/k3s/k3s.yaml` pointing at `https://127.0.0.1:6443`; pod CIDR `10.42.0.0/16`, service CIDR `10.43.0.0/16`; `local-path` is the default storage class; uninstall with `/usr/local/bin/k3s-uninstall.sh`.
 - The ufw commands:
 
 ```bash
@@ -1254,7 +1165,7 @@ ufw --force enable
 - Smoke test: `KUBECONFIG=<kubeconfig> kubectl get nodes` shows the node Ready through the tunnel; `nc -z -w5 <ip> 6443` from outside fails.
 
 `prompts/integrations/sops-age.md` must contain:
-- `Tested with:` sops and age versions (from Task 6) and the date.
+- `Tested with:` sops and age versions (current) and the date; run the card's smoke test locally before committing it.
 - Facts: key creation `age-keygen -o <key-file>`; the recipient `age-keygen -y <key-file>` (public, safe to show); encryption of a Secret manifest read from stdin without naming a file that holds plaintext:
 
 ```bash
@@ -1279,15 +1190,55 @@ creation_rules:
 - Smoke test: encrypt a Secret with a dummy value `x=1`, check that the file contains `ENC[`, decrypt it to `/dev/null`.
 
 `prompts/integrations/flux.md` must contain:
-- `Tested with:` the Flux version (from Task 6) and the date.
+- `Tested with:` the Flux version (current) and the date.
 - Facts: `flux check --pre`; bootstrap `GITHUB_TOKEN=$(gh auth token) flux bootstrap github --owner=<owner> --repository=<repo> --branch=main --path=clusters/<name> --private=true --personal=<true|false>` (true when the owner is a user account) — it commits `clusters/<name>/flux-system/` to `main`, so run `git pull --rebase origin main` afterwards; Kustomizations with `dependsOn` and `wait: true` order CRDs before their objects; `flux get kustomizations -A`, `flux get helmreleases -A`, `flux reconcile source git flux-system`.
 - Pitfalls: a ClusterIssuer in the same Kustomization as the cert-manager HelmRelease fails on the first run (CRDs missing), so they live in two Kustomizations; the bootstrap token only creates the deploy key and is not stored in the cluster.
 - Smoke test: `flux check` passes and `flux get kustomizations -A` lists `flux-system` Ready.
 
-`prompts/integrations/ingress-sslip.md` must contain:
-- `Tested with:` cert-manager version (from Task 6), Traefik bundled with the k3s version, the date.
-- Facts: `<a.b.c.d>.sslip.io` resolves to `a.b.c.d`; the Public Suffix List result and what it means for rate limits (from Task 6); HTTP-01 through Traefik works; the ClusterIssuer and the placeholder Deployment, Service and Ingress exactly as applied in Task 6, step 3, with the host written `<host>`.
-- Pitfalls: a new server IP means a new host: the certificate, the GitHub App webhook URL and `factory.yaml` all change; Let's Encrypt limits duplicate certificates for the same host to a few per week, so do not delete and re-create the certificate in a loop.
+`prompts/integrations/ingress.md` must contain:
+- `Tested with:` cert-manager version (current), Traefik bundled with the k3s version, the date.
+- Facts: the host is a name in the user's domain with an A record to the server's IPv4 (`dig +short <host>` prints it); HTTP-01 through Traefik; why not `sslip.io` or a bare IP address (one sentence, pointing to the spec's Check results); the ClusterIssuer and the placeholder Deployment, Service and Ingress, with `<host>` and `<email>` from `factory.yaml`:
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata: { name: letsencrypt }
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: <email>
+    privateKeySecretRef: { name: letsencrypt-account }
+    solvers: [ { http01: { ingress: { ingressClassName: traefik } } } ]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: healthz, namespace: factory }
+spec:
+  selector: { matchLabels: { app: healthz } }
+  template:
+    metadata: { labels: { app: healthz } }
+    spec: { containers: [ { name: whoami, image: traefik/whoami:v1.10, ports: [ { containerPort: 80 } ] } ] }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: healthz, namespace: factory }
+spec: { selector: { app: healthz }, ports: [ { port: 80 } ] }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: healthz
+  namespace: factory
+  annotations: { cert-manager.io/cluster-issuer: letsencrypt }
+spec:
+  ingressClassName: traefik
+  tls: [ { hosts: [ <host> ], secretName: healthz-tls } ]
+  rules:
+    - host: <host>
+      http: { paths: [ { path: /healthz, pathType: Prefix, backend: { service: { name: healthz, port: { number: 80 } } } } ] }
+```
+
+- Pitfalls: a new server address needs the A record changed (the host, the certificate and the App webhook URL stay); a CAA record on the domain must allow `letsencrypt.org`; an A record that is still propagating fails HTTP-01, so wait for `dig` first; Let's Encrypt allows 5 certificates for the same host per week, so do not delete and re-create the certificate in a loop.
 - Smoke test: `curl -fsS --max-time 10 https://<host>/healthz` (no `-k`) and `echo | openssl s_client -connect <host>:443 -servername <host> 2>/dev/null | openssl x509 -noout -issuer`.
 
 - [ ] **Step 2: Run the check**
@@ -1299,7 +1250,7 @@ Expected: `check: ok` (every card has its sections and `Tested with:` line).
 
 ```bash
 git add prompts/integrations
-git commit -m "Add integration cards for the Hetzner server, k3s, sops with age, Flux and the sslip ingress"
+git commit -m "Add integration cards for the Hetzner server, k3s, sops with age, Flux and the ingress"
 ```
 
 ---
@@ -1457,12 +1408,18 @@ Ask the user for the factory's settings and write them to `factory.yaml`.
    (for example `root@203.0.113.10`). Run the smoke test of
    `integrations/hetzner-ssh.md`. Refuse and explain when the login fails,
    the OS is not Ubuntu 24.04 or Debian 12, or the address is not a public
-   IPv4 (an IPv6-only server cannot be used in this version). Compare CPU,
+   IPv4 (an IPv6-only server cannot be used in this version: GitHub is not
+   reachable over IPv6). Compare CPU,
    memory and disk with the recommended size in the card and tell the user.
-2. Ingress. The default host is `<ipv4>.sslip.io`. Ask whether the user
-   prefers their own domain. When yes: ask for the host, tell them to create
-   an A record pointing to the IPv4, and wait until `dig +short <host>`
-   prints that address.
+2. Host and email. The factory needs a host name in a domain the user
+   controls, for example `factory.example.com`; the App's webhooks and the
+   certificate use it. Ask for the host and for an email for the Let's
+   Encrypt account (it is written to the repository; it is not a secret).
+   Tell the user to create an A record from the host to the server's IPv4 at
+   their DNS provider, then check every 30 seconds, for up to 15 minutes,
+   until `dig +short <host>` prints exactly that address. When it prints
+   nothing or another address, say so and keep waiting; do not continue
+   before it matches.
 3. Projects. Ask which GitHub repositories the factory will serve (at least
    one). For each, `gh repo view <owner>/<repo>` must succeed. Name each
    project after its repository in lower case.
@@ -1482,7 +1439,7 @@ Ask the user for the factory's settings and write them to `factory.yaml`.
    home: { forge: github, repo: acme/acme-factory }
    runtime:
      server: { ssh: root@203.0.113.10 }
-     ingress: { host: 203.0.113.10.sslip.io }
+     ingress: { host: factory.acme.example, email: admin@acme.example }
      harness: { kind: claude, models: { work: opus, review: sonnet } }
      limits: { concurrentTurns: 2, turnDeadlineSeconds: 3600, maxAgentTurns: 100 }
    projects:
@@ -1720,7 +1677,7 @@ git commit -m "Add the secrets and GitHub App phases and the GitHub App card"
 - Modify: `prompts/install.md` (sections `### Phase server` and `### Phase gitops`)
 
 **Interfaces:**
-- Consumes: `hetzner-ssh.md`, `k3s.md`, `flux.md`, `sops-age.md`, `ingress-sslip.md` (Task 7); `phases.home.ownerType` (Task 8); `secrets/` (Task 10).
+- Consumes: `hetzner-ssh.md`, `k3s.md`, `flux.md`, `sops-age.md`, `ingress.md` (Task 7); `phases.home.ownerType` (Task 8); `secrets/` (Task 10).
 - Produces: `~/.config/software-factory/<name>.kubeconfig` (server `https://127.0.0.1:16443`); `.factory/bin/tunnel.sh`; in the repository: `clusters/<name>/flux-system/` (from bootstrap), `clusters/<name>/infra.yaml`, `clusters/<name>/secrets.yaml`, `clusters/<name>/apps.yaml`, `infra/base/`, `infra/config/`, `deploy/healthz/`; state outputs `k3sVersion`, `fluxVersion`.
 
 - [ ] **Step 1: Write the section `### Phase server`**
@@ -1766,7 +1723,7 @@ Uses `integrations/hetzner-ssh.md` and `integrations/k3s.md`. `<ssh>` is
 ### Phase gitops
 
 Uses `integrations/flux.md`, `integrations/sops-age.md` and
-`integrations/ingress-sslip.md`. Run `.factory/bin/tunnel.sh` first and
+`integrations/ingress.md`. Run `.factory/bin/tunnel.sh` first and
 `export KUBECONFIG=~/.config/software-factory/<name>.kubeconfig`.
 
 1. `flux check --pre`.
@@ -1781,7 +1738,7 @@ Uses `integrations/flux.md`, `integrations/sops-age.md` and
    `cert-manager` with `install.createNamespace: true`, the chart version
    from the ingress card and values `crds: { enabled: true }`).
 5. Write `infra/config/cluster-issuer.yaml` with the ClusterIssuer from the
-   ingress card.
+   ingress card, `email` from `runtime.ingress.email`.
 6. Write `deploy/healthz/` with the placeholder Deployment, Service and
    Ingress from the ingress card, in namespace `factory`, host
    `runtime.ingress.host`. The factory's controller replaces it later.
@@ -1898,15 +1855,15 @@ The prompts are tested by a fresh agent following them. The user runs the harnes
 
 - [ ] **Step 1: Prepare**
 
-Ask the user for: a fresh Hetzner server (rebuilt with Ubuntu 24.04), permission to create test repositories under their GitHub account (a private factory repository and one project repository, for example `sf-e2e-shop` with a README), and which runtime agent they will name in the interview. Clone the local upstream: `git clone ~/prj-other/software-factory ~/tmp/sf-e2e && cd ~/tmp/sf-e2e`.
+Ask the user for: a fresh Hetzner server (rebuilt with Ubuntu 24.04), permission to create test repositories under their GitHub account (a private factory repository and one project repository, for example `sf-e2e-shop` with a README), a test host in their domain (they create its A record during the interview) with an email for Let's Encrypt, and which runtime agent they will name in the interview. Clone the local upstream: `git clone ~/prj-other/software-factory ~/tmp/sf-e2e && cd ~/tmp/sf-e2e`.
 
 - [ ] **Step 2: Plant a canary**
 
 Tell the user to put a canary value into the env file when the secrets phase asks for the model key, for example `ANTHROPIC_API_KEY=sk-canary-<8 random hex>`, and to replace it with the real key only after this run. Note the canary value.
 
-- [ ] **Step 3: Refusal of an IPv6-only address**
+- [ ] **Step 3: A host that does not resolve yet**
 
-Ask the user to start their harness in `~/tmp/sf-e2e` with a fresh session ("install the factory") and, at the server question of the interview, first enter `root@2001:db8::1`. Expected: the agent refuses and explains that a public IPv4 is needed. Then the user enters the real address.
+Ask the user to start their harness in `~/tmp/sf-e2e` with a fresh session ("install the factory") and, at the host question of the interview, give the host before creating its A record. Expected: the agent asks for the record and waits until `dig +short <host>` prints the server's address; it does not write `factory.yaml` before that. Then the user creates the record.
 
 - [ ] **Step 4: Interrupt during gitops**
 
@@ -1930,11 +1887,11 @@ When the user administers a GitHub organisation, repeat only the github-app phas
 
 - [ ] **Step 9: Fix and repeat**
 
-For every problem seen (a wrong command, a missing check, the agent guessing), fix the prompt or card in `~/prj-other/software-factory`, run `pnpm --dir tools/check check`, commit, and repeat the run from a rebuilt server until one run passes without intervention beyond the human steps. Then set the date of the `0.1.0-alpha.1` entry in `CHANGELOG.md` and commit.
+For every problem seen (a wrong command, a missing check, the agent guessing), fix the prompt or card in `~/prj-other/software-factory`, run `pnpm --dir tools/check check`, commit, and repeat the run from a rebuilt server until one run passes without intervention beyond the human steps. Then record check 5 from the passing run: `ssh <ssh> 'free -m'` and, through the tunnel, `kubectl top pods -A`; write the recommended server size (the memory in use plus 4 GiB for one turn, rounded up to a Hetzner server type) into the spec's Check results and `hetzner-ssh.md`, and replace every card's `Tested with:` line with the versions and date of that run. Set the date of the `0.1.0-alpha.1` entry in `CHANGELOG.md` and commit.
 
 - [ ] **Step 10: Clean up the test resources**
 
-Ask the user before deleting: the test repositories (`gh repo delete <owner>/<repo> --yes`), the test GitHub App (settings page), the server (Hetzner console), `~/.config/software-factory/<test-name>.*`.
+Ask the user before deleting: the test repositories (`gh repo delete <owner>/<repo> --yes`), the test GitHub App (settings page), the server (Hetzner console), the test A record (their DNS provider), `~/.config/software-factory/<test-name>.*`.
 
 ---
 

@@ -29,9 +29,12 @@
         },
         "ingress": {
           "type": "object",
-          "required": ["host"],
+          "required": ["host", "email"],
           "additionalProperties": false,
-          "properties": { "host": { "type": "string", "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$" } }
+          "properties": {
+            "host": { "type": "string", "pattern": "^([a-z0-9]([a-z0-9-]*[a-z0-9])?\\.)+[a-z][a-z0-9-]*[a-z0-9]$" },
+            "email": { "type": "string", "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$" }
+          }
         },
         "harness": {
           "oneOf": [

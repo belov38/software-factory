@@ -8,4 +8,5 @@ changes the specification has a Migration section: a prompt that
 
 - Installer phases doctor, home, interview, secrets, github-app, server and
   gitops, and the install checks INSTALL-1 and INSTALL-2 against a placeholder
-  health endpoint. The factory itself comes in a later version.
+  health endpoint on a host in the user's own domain. The factory itself comes
+  in a later version.

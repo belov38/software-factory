@@ -12,7 +12,7 @@ const factory = `name: acme-factory
 home: { forge: github, repo: acme/acme-factory }
 runtime:
   server: { ssh: root@203.0.113.10 }
-  ingress: { host: 203.0.113.10.sslip.io }
+  ingress: { host: factory.acme.example, email: admin@acme.example }
   harness: { kind: claude, models: { work: opus, review: sonnet } }
   limits: { concurrentTurns: 2, turnDeadlineSeconds: 3600, maxAgentTurns: 100 }
 projects:
@@ -42,6 +42,14 @@ describe('factory schema', () => {
     expect(errors).toContain('/runtime/server/ssh')
     expect(errors).toContain("must have required property 'projects'")
     expect(errors).toContain('must NOT have additional properties')
+  })
+
+  it('requires a host name in a domain and an email for the ingress', () => {
+    const doc = parse(factory)
+    doc.runtime.ingress = { host: '203.0.113.10' }
+    const errors = validateDocument(repo, 'factory', doc).join('\n')
+    expect(errors).toContain('/runtime/ingress/host must match pattern')
+    expect(errors).toContain("/runtime/ingress must have required property 'email'")
   })
 })
 

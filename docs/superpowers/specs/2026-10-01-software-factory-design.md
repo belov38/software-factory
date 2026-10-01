@@ -25,8 +25,8 @@ upgrade prompts.
 
 ## Goals for v1
 
-- A person with an existing Hetzner server (SSH access) and a GitHub account
-  runs the installer and gets a working factory that passes every acceptance
+- A person with an existing Hetzner server (SSH access), a GitHub account and
+  a domain name where they can add a DNS record runs the installer and gets a working factory that passes every acceptance
   check in `verify`.
 - The same prompts produce a passing factory with either runtime agent:
   Claude Code (`claude -p`) or OpenCode with OpenRouter.
@@ -47,6 +47,8 @@ upgrade prompts.
 - Creating servers through the Hetzner API, multi-node clusters, high
   availability, native Windows.
 - GitHub agent apps (see Related work: partner-only as of September 2026).
+- Hostnames from wildcard DNS services such as `sslip.io`, and certificates
+  for bare IP addresses (see Check results).
 
 ## Decisions
 
@@ -60,7 +62,7 @@ upgrade prompts.
 | 6 | Stack of generated code | Fixed: TypeScript on Node 22, pnpm workspaces, Fastify, zod, vitest, `@kubernetes/client-node`, SQLite. |
 | 7 | GitOps | Flux, bootstrapped into the user's private repository, with SOPS and age for secrets. |
 | 8 | GitHub identity | A GitHub App created through the manifest flow; short-lived installation tokens per turn phase. |
-| 9 | Ingress | `<server-ip>.sslip.io` by default, the user's own domain optional; Traefik (bundled with k3s), cert-manager, Let's Encrypt HTTP-01. |
+| 9 | Ingress and events | The user's own domain, with an A record to the server, is required; Traefik (bundled with k3s), cert-manager, Let's Encrypt HTTP-01 with an account registered to the user's email. GitHub delivers App webhooks to `https://<host>/webhooks/github`; a catch-up poll of the API every few minutes picks up what a lost delivery missed. |
 | 10 | Integration shape | Adapters are modules in one codebase behind ports; core and adapters exchange message-shaped values validated by zod schemas, so a module can move to a separate service later. |
 | 11 | Security | Isolation rules are requirements with acceptance checks from v1; deeper hardening comes as separate prompts later. |
 
@@ -92,7 +94,7 @@ software-factory/
       ports/
         tracker.md  channel.md  forge.md  credentials.md  runner.md  harness.md
     integrations/      integration cards: verified facts, pitfalls, smoke tests
-      hetzner-ssh.md  k3s.md  flux.md  sops-age.md  ingress-sslip.md
+      hetzner-ssh.md  k3s.md  flux.md  sops-age.md  ingress.md
       github-app.md  github-issues.md  github-comments.md  ghcr.md
       claude-cli.md  opencode-openrouter.md
     verify.md          acceptance checks against the running factory
@@ -141,7 +143,7 @@ name: acme-factory
 home: { forge: github, repo: acme/acme-factory }
 runtime:
   server: { ssh: root@203.0.113.10 }
-  ingress: { host: 203.0.113.10.sslip.io }   # or the user's own domain
+  ingress: { host: factory.acme.example, email: admin@acme.example }
   harness: { kind: claude, models: { work: opus, review: sonnet } }
   # harness: { kind: opencode, provider: openrouter, models: { work: <id>, review: <id> } }
   limits: { concurrentTurns: 2, turnDeadlineSeconds: 3600, maxAgentTurns: 100 }
@@ -168,7 +170,7 @@ value) in `.factory/state.json`, so an interrupted installation resumes.
 |---|---|---|---|
 | 1 | doctor | Checks OS (macOS, Linux, WSL) and tools: git, gh (logged in, `workflow` scope), ssh, kubectl, flux, sops, age, node 22, pnpm, jq. Installs what is missing with brew or apt. | Approves installs |
 | 2 | home | Creates the private copy and remotes. | — |
-| 3 | interview | Server address, repositories to serve, runtime agent and models, limits, ingress. Writes and commits `factory.yaml`. | Answers |
+| 3 | interview | Server address; the factory's host name in the user's domain and an email for Let's Encrypt, then waits until the host resolves to the server; repositories to serve, runtime agent and models, limits. Writes and commits `factory.yaml`. | Answers, creates the DNS A record |
 | 4 | secrets | Generates the age key at `~/.config/software-factory/<name>.agekey`, writes a template `~/.config/software-factory/<name>.env`, encrypts it with sops into `secrets/`. | Fills in the env file, backs up the age key |
 | 5 | github-app | Manifest flow: a local page posts the App manifest to GitHub (webhook `https://<host>/webhooks/github`); a localhost redirect receives the code; a script converts it into app id, private key and webhook secret and writes them straight into the encrypted secrets. | Clicks Create, then Install on the chosen repositories |
 | 6 | server | Over SSH: checks OS (Ubuntu 24.04 or Debian 12) and resources, configures ufw (22, 80, 443 only), installs a pinned k3s. The Kubernetes API is reached only through an SSH tunnel. | — |
@@ -182,8 +184,9 @@ Secrets rule: the harness works with paths to secret files, never with their
 values. It does not print env files or put values on command lines. This is
 a rule in the prompts; a later hardening prompt checks it.
 
-Human inputs, in full: a Hetzner server with the user's SSH key; `gh auth
-login`; a model key (Anthropic or OpenRouter); a token to pull images from
+Human inputs, in full: a Hetzner server with the user's SSH key; a host name
+in the user's domain with an A record to the server, and an email for Let's
+Encrypt; `gh auth login`; a model key (Anthropic or OpenRouter); a token to pull images from
 ghcr (see Checks before writing prompts, item 2); two clicks for the GitHub
 App; a backup of the age key.
 
@@ -196,7 +199,7 @@ App; a backup of the age key.
                        │ https://<host>/webhooks/github
                        ▼
 ┌──────────── factory-controller (Deployment, 1 replica) ─────────────┐
-│ inbound adapters: verify signatures, emit canonical events          │
+│ webhooks (verified) and a catch-up poll emit canonical events       │
 │ core: ledger (SQLite on a PVC), sessions, queue, loop limits         │
 │ /internal: scoped installation tokens, turn results (Job nonce)      │
 │ /s/<turn>: status page without logs                                 │
@@ -280,6 +283,10 @@ events. Pull request events count only for branches under `factory/`.
   turns, changes, the links between them and an event log with usage per
   turn. Jobs execute; the ledger is the source of truth. The queue lives in
   the ledger; the controller creates a Job when a slot is free.
+- Webhooks can be lost (the controller is restarting, GitHub has an incident).
+  A catch-up poll every few minutes reads what changed in each project
+  repository since its cursor in the ledger, with conditional requests, and
+  emits the events a webhook did not deliver.
 
 ### Isolation (reference profile)
 
@@ -322,7 +329,9 @@ apps/factory/packages/
 - `change.checks_failed`: `{change, check, logExcerpt}`
 - `change.merged`, `change.closed`: `{change}`
 
-Every event carries a `deliveryId`; a redelivered webhook starts nothing new.
+Every event carries a `deliveryId` derived from its source object (for
+example a comment id and its update time), so a redelivered webhook, or the
+same change seen by a webhook and by the catch-up poll, starts nothing new.
 
 ### Ports (core to adapters)
 
@@ -409,6 +418,7 @@ installation, after every upgrade, and on demand.
 | CORE-5 | A question with options, answered with a number, continues the work. |
 | CORE-6 | A follow-up resumes the same agent session. |
 | CORE-7 | `stop` cancels the running turn and says so. |
+| CORE-8 | A mention made while webhook deliveries fail is picked up by the catch-up poll. |
 | REVIEW-1 | A review turn posts a review with a verdict on the new pull request. |
 | REVIEW-2 | Findings without a human decision lead to exactly one revision turn. |
 | REVIEW-3 | After review the pull request is ready for review and the channel tells the human, with the summary. |
@@ -460,7 +470,8 @@ Each is verified first; a different outcome changes this document.
 2. Pulling private images from ghcr: whether a fine-grained token can read
    packages; otherwise a classic token with `read:packages`.
 3. GitHub App manifest flow with a `localhost` redirect.
-4. Let's Encrypt for `<ip>.sslip.io` hostnames: issuance and rate limits.
+4. Let's Encrypt HTTP-01 for the user's host through Traefik and cert-manager
+   (shown by INSTALL-2 in the end-to-end run of the installer).
 5. k3s, Flux, cert-manager and one turn on the smallest suitable Hetzner
    server: memory and CPU; the recommended server size.
 6. k3s NetworkPolicy enforcement for the egress rules above, including the
@@ -470,6 +481,24 @@ Each is verified first; a different outcome changes this document.
    events to the App.
 8. Installation tokens restricted to one repository and a subset of
    permissions at creation time.
+
+### Check results (Plan 1, 2026-10-01)
+
+- Hostnames from wildcard DNS services (former check 4). `sslip.io`,
+  `nip.io` and `traefik.me` are not on the Public Suffix List, so every
+  `<ip>.sslip.io` certificate counts against one Let's Encrypt limit shared
+  with all users of the service; `traefik.me` also publishes the private key
+  of its wildcard certificate. A Let's Encrypt certificate for a bare IP
+  address (`shortlived` profile, 160 hours, available since January 2026) was
+  issued in about 85 seconds by cert-manager 1.21.1 through an HTTP-01
+  Ingress solver on k3s 1.36 with Traefik 3.7, but serving it to clients that
+  send no SNI, GitHub included, takes over Traefik's default certificate for
+  the whole node. Decision 9 therefore requires the user's own domain.
+- Conditional requests for the catch-up poll. Three
+  `GET /repos/{owner}/{repo}/issues/comments` requests with `If-None-Match`
+  returned `304` and left `X-RateLimit-Remaining` unchanged (a user token;
+  Plan 2 repeats it with an installation token). The repository Events API is
+  not suitable: GitHub documents its latency as 30 seconds to 6 hours.
 
 ## Risks
 
@@ -482,6 +511,9 @@ Each is verified first; a different outcome changes this document.
   by the code the agent runs; accepted, the key can be revoked.
 - A public HTTPS endpoint on a small server; only webhooks, the status page
   and health are exposed, and webhook signatures are checked.
+- The installation depends on a domain the user controls: a new server
+  address needs the A record changed, and a record that no longer points at
+  the server stops webhooks and certificate renewal.
 
 ## Related work
 
