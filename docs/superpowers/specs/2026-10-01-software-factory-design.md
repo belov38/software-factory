@@ -499,6 +499,14 @@ Each is verified first; a different outcome changes this document.
   returned `304` and left `X-RateLimit-Remaining` unchanged (a user token;
   Plan 2 repeats it with an installation token). The repository Events API is
   not suitable: GitHub documents its latency as 30 seconds to 6 hours.
+- Check 3, the manifest flow. A local page on `127.0.0.1:8765` posted a
+  manifest (`redirect_url` `http://127.0.0.1:8765/callback`, an inactive
+  webhook, read-only permissions) to `https://github.com/settings/apps/new`
+  for a personal account. After "Create GitHub App", GitHub redirected to the
+  `127.0.0.1` callback with `code` and `state`, and
+  `POST /app-manifests/<code>/conversions` without authentication returned
+  `201` with `id`, `slug`, `pem` and `webhook_secret`. The design stands
+  (gh 2.86.0).
 
 ## Risks
 
