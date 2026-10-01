@@ -75,9 +75,9 @@ The build phase in `prompts/install.md` generates everything described here.
       link, turn kind and state, plan, current action, pull request link. No
       logs and no transcript. `404` for an unknown id. Turn ids are random
       UUIDs, so the page cannot be guessed.
-    - `POST /internal/credentials` and `POST /internal/turns/:id/result`, for
-      turn containers only (`prompts/spec/ports/credentials.md`,
-      `prompts/spec/ports/runner.md`).
+    - `GET /internal/turns/:id`, `POST /internal/credentials` and
+      `POST /internal/turns/:id/result`, for turn containers only
+      (`prompts/spec/ports/credentials.md`, `prompts/spec/ports/runner.md`).
 11. The Ingress routes only `/webhooks/github`, `/s/` and `/healthz` to the
     controller; `/internal` is reachable only inside the cluster.
 
