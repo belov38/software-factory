@@ -58,7 +58,7 @@ Tested with: cert-manager v1.21.2 (chart from https://charts.jetstack.io), traef
     annotations: { cert-manager.io/cluster-issuer: letsencrypt }
   spec:
     ingressClassName: traefik
-    tls: [ { hosts: [ <host> ], secretName: healthz-tls } ]
+    tls: [ { hosts: [ <host> ], secretName: factory-tls } ]
     rules:
       - host: <host>
         http: { paths: [ { path: /healthz, pathType: Prefix, backend: { service: { name: healthz, port: { number: 80 } } } } ] }

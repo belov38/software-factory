@@ -144,9 +144,10 @@ The build phase in `prompts/install.md` generates everything described here.
     and a concurrency group, so two runs never race. It logs in to ghcr with
     `GITHUB_TOKEN`, builds and pushes the factory image, then the agent image
     with `FACTORY_IMAGE` pointing at the factory image just pushed, both
-    tagged with the first 7 characters of the commit SHA. Then it sets
-    `image.tag` in `deploy/releases/factory.yaml`, commits
-    `Deploy factory images <sha7>` and pushes. A commit made with
+    tagged with the first 7 characters of the commit SHA. Then, when
+    `deploy/releases/factory.yaml` exists (the deploy phase writes it), it
+    sets `image.tag` there, commits `Deploy factory images <sha7>` and
+    pushes. A commit made with
     `GITHUB_TOKEN` starts no workflow, so there is no loop. Actions are used
     at their current major versions.
 

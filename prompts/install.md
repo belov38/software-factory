@@ -20,6 +20,8 @@ where it stopped.
    against `prompts/spec/state.schema.json` as in `doctor.md`, commit and push.
 3. When a phase fails, record nothing for it, tell the user what failed and
    what you tried, and stop. Running `install.md` again resumes here.
+4. Before every push, `git pull --rebase origin main`: from the build phase
+   on, the images workflow also commits to `main`.
 
 | Phase | Where | Outputs recorded |
 |---|---|---|
@@ -30,16 +32,10 @@ where it stopped.
 | github-app | below | `appId`, `appSlug` |
 | server | below | `k3sVersion` |
 | gitops | below | `fluxVersion`, `certManagerVersion` |
+| build | below | `commit` |
+| deploy | below | `imageTag` |
 | verify | below | `report` |
-
-This version ends after the verify phase with the install checks. The phases
-build, deploy and handoff arrive in a later version: tell the user what is
-running and that the factory itself comes with the next version of the
-prompts (`git merge upstream/main`).
-
-At the very end, ask once whether the user wants to star the project on
-GitHub. Only when they say yes, run
-`gh api -X PUT user/starred/belov38/software-factory`.
+| handoff | below | — |
 
 ### Phase secrets
 
@@ -72,9 +68,17 @@ Uses `integrations/sops-age.md`. `<name>` is `name` in `factory.yaml`.
 8. Check: `grep -c 'ENC\[' secrets/factory-model.sops.yaml` is at least 1 and
    `SOPS_AGE_KEY_FILE=~/.config/software-factory/<name>.agekey sops --decrypt secrets/factory-model.sops.yaml > /dev/null`
    succeeds.
-9. Tell the user to back up `~/.config/software-factory/<name>.agekey` now
+9. The token for pulling the factory's images (`integrations/ghcr.md`):
+   create `~/.config/software-factory/<name>.ghcr.env` (mode 600) with
+   `GHCR_TOKEN=` unless it exists. Tell the user to open
+   `https://github.com/settings/tokens/new?scopes=read:packages&description=<name>-ghcr-pull`,
+   create the classic token with only `read:packages`, paste it into that
+   file, save and reply "done". Check it as in step 6, build
+   `secrets/ghcr-pull.sops.yaml` with the card's pipe and check it as in
+   step 8.
+10. Tell the user to back up `~/.config/software-factory/<name>.agekey` now
    (a password manager): without it every secret must be created again.
-10. Commit `.sops.yaml` and `secrets/`. Record `ageRecipient`.
+11. Commit `.sops.yaml` and `secrets/`. Record `ageRecipient`.
 
 ### Phase github-app
 
@@ -112,6 +116,11 @@ the script with `--check-only`.
      until it succeeds. Only then it redirects the browser to
      `https://github.com/apps/<slug>/installations/new`. The plaintext exists
      only in the script's memory;
+   - with `--deliveries`, prints the last 20 webhook deliveries
+     (`GET /app/hook/deliveries`: event, status code, time) and exits; with
+     `--webhook-url <url>`, sets the App's webhook URL
+     (`PATCH /app/hook/config`) and exits; both read the key like
+     `--check-only`;
    - then polls `GET /app/installations` with an App JWT every 5 seconds,
      for at most 10 minutes, until one exists; lists its repositories with an
      installation token;
@@ -218,9 +227,10 @@ Uses `integrations/flux.md`, `integrations/sops-age.md` and
    HelmRepository, values `crds: { enabled: true }`, interval `1h`).
 5. Write `infra/config/cluster-issuer.yaml` with the ClusterIssuer from the
    ingress card, `email` from `runtime.ingress.email`.
-6. Write `deploy/healthz/` with the placeholder Deployment, Service and
-   Ingress from the ingress card, in namespace `factory`, host
-   `runtime.ingress.host`, and the latest `traefik/whoami` tag. The factory's controller replaces it later.
+6. Write `deploy/releases/healthz.yaml` with the placeholder Deployment,
+   Service and Ingress from the ingress card, in namespace `factory`, host
+   `runtime.ingress.host`, and the latest `traefik/whoami` tag. The deploy
+   phase replaces it with the factory.
 7. Write the Flux Kustomizations in `clusters/<name>/`. Each one is
    `kustomize.toolkit.fluxcd.io/v1` in namespace `flux-system`, with
    `sourceRef: { kind: GitRepository, name: flux-system }`, `interval: 10m`
@@ -230,25 +240,100 @@ Uses `integrations/flux.md`, `integrations/sops-age.md` and
      `dependsOn: [infra]`, `wait: true`);
    - `secrets.yaml`: Kustomization `secrets` (path `./secrets`,
      `dependsOn: [infra]`, `decryption: { provider: sops, secretRef: { name: sops-age } }`);
-   - `apps.yaml`: Kustomization `apps` (path `./deploy`,
+   - `apps.yaml`: Kustomization `apps` (path `./deploy/releases`,
      `dependsOn: [infra-config, secrets]`, `wait: true`).
 8. Commit and push, then `.factory/bin/kube flux reconcile source git flux-system`
    and wait up to 10 minutes until `.factory/bin/kube flux get kustomizations -A`
    shows every row Ready.
 9. Wait until `.factory/bin/kube kubectl -n factory get certificate` shows
-   `healthz-tls` Ready.
+   `factory-tls` Ready.
 10. Record `fluxVersion` (`flux --version`) and `certManagerVersion`.
+
+### Phase build
+
+Uses every file under `prompts/spec/` (start with `architecture.md`) and the
+cards under `integrations/`. `<owner>` is the owner of `home.repo`.
+
+1. Sandbox. When `gh repo view <owner>/factory-sandbox` fails, create it with
+   `gh repo create <owner>/factory-sandbox --private --add-readme`. In a
+   scratch clone outside this repository, add a small TypeScript library: a
+   `package.json` with vitest, `src/sum.ts` exporting `sum(a, b)`,
+   `src/sum.test.ts`, and `.github/workflows/ci.yml` running the tests on
+   pushes and pull requests; push it to `main`.
+2. Ask the user to add `factory-sandbox` to the App's installation at
+   `https://github.com/apps/<appSlug>/installations/new` (configure, select
+   the repository, save), and wait until
+   `node .factory/bin/github-app.mjs --check-only` lists it.
+3. Add the sandbox to `projects` in `factory.yaml` (name `factory-sandbox`,
+   the same kinds as the other projects), check the file against its schema
+   and commit.
+4. Generate `apps/factory` as `prompts/spec/architecture.md` describes, one
+   component per commit, in this order: contracts, core, each adapter, turn,
+   controller. Each component comes with the tests that its spec file lists
+   under `## Tests`. Before each commit, `pnpm --dir apps/factory install`,
+   `pnpm --dir apps/factory -r typecheck` and `pnpm --dir apps/factory -r test`
+   pass.
+5. Run the contract tests: `pnpm --dir apps/factory -r test:contract`. They
+   read the App's credentials inside the test process with
+   `sops --decrypt secrets/github-app.sops.yaml` and
+   `SOPS_AGE_KEY_FILE=~/.config/software-factory/<name>.agekey`, never from a
+   plaintext file or the command line, and remove the issues, branches and
+   pull requests they create.
+6. Generate the Dockerfiles, the chart `deploy/charts/factory` and the
+   workflow `.github/workflows/factory-images.yml` (architecture 12 to 18),
+   one commit each. Check the chart with `helm template deploy/charts/factory`.
+   Do not write `deploy/releases/factory.yaml` yet: the deploy phase does.
+   The workflow updates `image.tag` only when that file exists.
+7. Push. The push starts the images workflow. Record `commit`, the full SHA
+   of `HEAD`.
+
+### Phase deploy
+
+Uses `integrations/ghcr.md`, `integrations/flux.md` and
+`prompts/spec/architecture.md`.
+
+1. Find the images workflow's run for the build commit,
+   `gh run list --workflow factory-images.yml --commit <phases.build.commit> --json databaseId -q '.[0].databaseId'`,
+   and wait with `gh run watch <id> --exit-status`. When it fails, read
+   `gh run view <id> --log-failed`, fix the cause, commit, push, and wait for
+   the new run.
+2. In one commit: write `deploy/releases/factory.yaml` (architecture 15) with
+   `image.tag` the first 7 characters of the commit the images were built
+   from, write `deploy/releases/factory-config.yaml` (architecture 16), and
+   remove `deploy/releases/healthz.yaml`. Push.
+3. `.factory/bin/kube flux reconcile source git flux-system`, then wait up to
+   10 minutes until `.factory/bin/kube flux get helmreleases -n factory`
+   shows `factory` Ready and `curl -fsS --max-time 10 https://<host>/healthz`
+   prints `{"ok":true}`. On `ImagePullBackOff`, see the ghcr card's Pitfalls.
+4. Record `imageTag`.
 
 ### Phase verify
 
-Run `verify.md`. This version has the install checks INSTALL-1 (Flux is
-Ready) and INSTALL-2 (the health endpoint answers over a valid certificate).
-When one fails, use the Pitfalls of the Flux and ingress cards, fix the
-cause by committing, and run `verify.md` again. Record `report:
-verify-report.md`.
+Run `verify.md` against `<owner>/factory-sandbox`. A full run takes about an
+hour and about 15 agent turns, which the user's model key pays for; say so
+before starting. When a check fails, use the Pitfalls of the cards involved,
+fix the cause by committing (generated code, chart or configuration),
+redeploy, and run the failed checks again. Record `report: verify-report.md`.
+
+### Phase handoff
+
+Tell the user, briefly:
+
+- How to give the factory work: mention `@<appSlug>` in an issue or a
+  comment of a project repository, or add the label `factory`. Answer its
+  questions with a number or in words; `@<appSlug> stop` stops a turn.
+- What follows: a draft pull request, an independent review, then the pull
+  request is theirs; their review comments and failing CI start new turns
+  on the same pull request.
+- Where the state is: `.factory/state.json` and `verify-report.md` in this
+  repository, the ledger on the cluster.
+- To back up `~/.config/software-factory/<name>.agekey` if they have not.
+
+Then ask once whether they want to star the project on GitHub. Only when they
+say yes, run `gh api -X PUT user/starred/belov38/software-factory`.
 
 ## Done when
 
 - `.factory/state.json` records every phase of this version as done and
   validates against the schema.
-- `verify-report.md` shows INSTALL-1 and INSTALL-2 passed.
+- `verify-report.md` shows every check of `verify.md` passed.

@@ -5,8 +5,7 @@ software factory on your infrastructure. The factory takes issues, runs
 coding agents on them in isolated runners, has the result reviewed by an
 independent agent and hands you pull requests to merge.
 
-Status: early alpha. This version installs the cluster, GitOps and the GitHub
-App; the factory itself arrives in a later version.
+Status: early alpha.
 
 ## What you need
 
@@ -39,7 +38,10 @@ part:
    chat. With a subscription, run `claude setup-token` in another terminal
    and paste the token into that file.
 4. Click "Create GitHub App" and then "Install" in the browser.
-5. Back up the age key file it names (for example in a password manager).
+5. Create a classic GitHub token for pulling the factory's images (the agent
+   gives you the link) and put it into the file it names.
+6. Add the test repository `factory-sandbox` to the App when asked.
+7. Back up the age key file it names (for example in a password manager).
 
 If the session stops, run `claude "install the factory"` in the same directory
 again: the installation continues where it stopped.

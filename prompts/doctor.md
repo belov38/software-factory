@@ -27,6 +27,8 @@ turn this clone into the user's private factory repository.
    | age | `age --version` | `brew install age` | `sudo apt-get install -y age` |
    | node 22+ | `node --version` | `brew install node` | https://github.com/nodesource/distributions |
    | jq | `jq --version` | `brew install jq` | `sudo apt-get install -y jq` |
+   | pnpm | `pnpm --version` | `brew install pnpm` | `sudo npm install -g pnpm` |
+   | helm | `helm version --short` | `brew install helm` | https://helm.sh/docs/intro/install/ |
    | curl | `curl --version` | built in | `sudo apt-get install -y curl` |
    | dig | `dig -v` | built in | `sudo apt-get install -y dnsutils` |
    | nc | `command -v nc` | built in | `sudo apt-get install -y netcat-openbsd` |
