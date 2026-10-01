@@ -13,6 +13,16 @@ sections, in this order:
 - `## Done when`: checks that must all pass; each can be run or observed.
 - `## Never` (optional): what must not happen.
 
+## Specification prompts
+
+`prompts/spec/**/*.md` say what the factory's code must do. They have these
+sections:
+
+- `## Purpose`: what the part is for.
+- `## Requirements`: numbered, each one testable.
+- `## Tests`: the tests the build phase must generate for it; contract tests
+  against the sandbox repository are marked as such.
+
 ## Integration cards
 
 `prompts/integrations/*.md` describe one external system each:
