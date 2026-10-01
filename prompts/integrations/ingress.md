@@ -8,8 +8,10 @@ Tested with: cert-manager v1.21.2 (chart from https://charts.jetstack.io), Traef
   record to the server's public IPv4: `dig +short <host>` prints that address.
   The App's webhooks and the certificate use it.
 - Hostnames from wildcard DNS services (`sslip.io`) and certificates for bare
-  IP addresses were tried and dropped; see "Check results" in the design
-  document under `docs/superpowers/specs/`.
+  IP addresses were tried and dropped. `sslip.io` is not on the Public Suffix
+  List, so all of its users share one Let's Encrypt limit; a certificate for
+  a bare IP address takes over Traefik's default certificate for the whole
+  node, because clients send no SNI for an IP address.
 - cert-manager is installed from the Helm chart `cert-manager`, version
   `v1.21.2`, repository `https://charts.jetstack.io`, with the values
   `crds: { enabled: true }`.

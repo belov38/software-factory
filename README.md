@@ -10,11 +10,12 @@ App; the factory itself arrives in a later version.
 
 ## What you need
 
-- A Hetzner server with 4 CPU and 16 GB of memory (depends on your workload).
+- A server with 4 CPU and 16 GB of memory (depends on your workload).
 - A host name in a domain you control, for example `factory.example.com`.
   You add its DNS A record when the installer asks: DNS only (in Cloudflare,
   proxy off), and no AAAA record.
-- If the server has a Hetzner Cloud Firewall, it allows TCP 22, 80 and 443.
+- If your provider has a firewall in front of the server, it allows TCP 22,
+  80 and 443.
 - A GitHub account, and the GitHub CLI logged in: `gh auth login`.
 - Claude Code, and either a Claude Pro or Max subscription or an Anthropic API
   key.
