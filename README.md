@@ -43,5 +43,3 @@ part:
 
 If the session stops, run `claude "install the factory"` in the same directory
 again: the installation continues where it stopped.
-
-Questions and problems: [Discussions](https://github.com/belov38/software-factory/discussions).

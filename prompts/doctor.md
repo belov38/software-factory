@@ -19,7 +19,7 @@ turn this clone into the user's private factory repository.
    | Tool | Check | macOS | Debian or Ubuntu |
    |---|---|---|---|
    | git | `git --version` | `brew install git` | `sudo apt-get install -y git` |
-   | gh | `gh --version` | `brew install gh` | https://github.com/cli/cli/blob/trunk/docs/install_linux.md |
+   | gh 2.94+ | `gh --version` | `brew install gh` or `brew upgrade gh` | https://github.com/cli/cli/blob/trunk/docs/install_linux.md |
    | ssh | `ssh -V` | built in | `sudo apt-get install -y openssh-client` |
    | kubectl | `kubectl version --client` | `brew install kubectl` | https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/ |
    | flux | `flux --version` | `brew install fluxcd/tap/flux` | `curl -s https://fluxcd.io/install.sh \| sudo bash` |
@@ -86,7 +86,8 @@ turn this clone into the user's private factory repository.
 
 ## Done when
 
-- Every check in step 2 succeeds, and node's major version is 22 or more.
+- Every check in step 2 succeeds, node's major version is 22 or more, and gh
+  is 2.94 or newer (`gh discussion` needs it).
 - `gh auth status` shows the `repo` and `workflow` scopes.
 - `git remote get-url origin` is the private repository and
   `git remote get-url upstream` is the public one.
