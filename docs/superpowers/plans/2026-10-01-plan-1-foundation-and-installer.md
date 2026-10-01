@@ -12,10 +12,12 @@
 
 **Amended 2026-10-01, after Task 5:** a host in the user's own domain replaces `<ip>.sslip.io` (spec decision 9 and "Check results (Plan 1, 2026-10-01)"), and `factory.yaml` gains `runtime.ingress.email` for the Let's Encrypt account. Task 6 is reduced to check 3, which needs no server; check 6 moves to Plan 2; checks 4 and 5 are covered by the end-to-end run in Task 13. Tasks 1-5 are unchanged below and record what was done.
 
+**Amended 2026-10-01, after Task 12:** v1 supports Claude Code only, as the agent that runs the installer and as the factory's runtime agent (spec decision 5); the model access is a subscription token from `claude setup-token` or an Anthropic API key. The README becomes a short guide for the user. After the final review, Task 14 publishes the repository first, and in Task 13 the user follows the README from the published repository in a directory of their choice; you watch the transcript and push fixes.
+
 **Plans in this series:**
 1. This plan: foundation, pre-writing check 3, installer phases doctor → gitops, INSTALL-1 and INSTALL-2 against a placeholder health endpoint; the end-to-end run covers checks 4 and 5.
 2. The factory: spec prompts (architecture, core, capabilities, ports), runtime integration cards, checks 1, 2, 6, 7 and 8, phases build and deploy, the remaining acceptance checks.
-3. Operation: `operate/*` prompts, upgrades through `CHANGELOG.md` migrations, HARNESS-1 with both runtime agents, release 0.1.0.
+3. Operation: `operate/*` prompts, upgrades through `CHANGELOG.md` migrations, release 0.1.0.
 
 ## Global Constraints
 
@@ -1844,7 +1846,7 @@ git commit -m "Add the verify prompt with the install checks and the verify phas
 
 ### Task 13: End-to-end run of the installer
 
-The prompts are tested by a fresh agent following them. The user runs the harness; you watch, collect problems, fix the prompts, and repeat until a clean run passes.
+The prompts are tested by a fresh agent following them. Runs after Task 14: the user follows `README.md` from the published repository as any user would; you watch the transcript, collect problems, push fixes, and the user repeats until a clean run passes.
 
 **Files:**
 - Modify: any prompt or card that a run shows to be wrong or unclear; `CHANGELOG.md` (date of the entry).
@@ -1855,19 +1857,19 @@ The prompts are tested by a fresh agent following them. The user runs the harnes
 
 - [ ] **Step 1: Prepare**
 
-Ask the user for: a fresh Hetzner server (rebuilt with Ubuntu 24.04), permission to create test repositories under their GitHub account (a private factory repository and one project repository, for example `sf-e2e-shop` with a README), a test host in their domain (they create its A record during the interview) with an email for Let's Encrypt, and which runtime agent they will name in the interview. Clone the local upstream: `git clone ~/prj-other/software-factory ~/tmp/sf-e2e && cd ~/tmp/sf-e2e`.
+The user prepares what the README lists (a fresh server, a test host whose A record they create only when the interview asks, a project repository of their own) and tells you the directory they will clone into. Their transcript is then in `~/.claude/projects/<that absolute path with every / and . replaced by ->/`; read it as the run goes, without printing secrets.
 
 - [ ] **Step 2: Plant a canary**
 
-Tell the user to put a canary value into the env file when the secrets phase asks for the model key, for example `ANTHROPIC_API_KEY=sk-canary-<8 random hex>`, and to replace it with the real key only after this run. Note the canary value.
+Tell the user to put a canary value into the env file when the secrets phase asks for the model key, for example `ANTHROPIC_API_KEY=sk-canary-<8 random hex>`, and to replace it with the real token or key only after this run (this version stores the key but does not use it). Note the canary value.
 
 - [ ] **Step 3: A host that does not resolve yet**
 
-Ask the user to start their harness in `~/tmp/sf-e2e` with a fresh session ("install the factory") and, at the host question of the interview, give the host before creating its A record. Expected: the agent asks for the record and waits until `dig +short <host>` prints the server's address; it does not write `factory.yaml` before that. Then the user creates the record.
+At the host question of the interview, the user gives the host before creating its A record. Expected: the agent asks for the record and waits until `dig +short <host>` prints the server's address; it does not write `factory.yaml` before that. Then the user creates the record.
 
 - [ ] **Step 4: Interrupt during gitops**
 
-When the gitops phase has pushed the bootstrap commit, ask the user to stop the harness.
+When the gitops phase has pushed the bootstrap commit, ask the user to stop the session.
 
 - [ ] **Step 5: Resume**
 
@@ -1879,7 +1881,7 @@ After a passing run, ask the user to start a session and ask for the server phas
 
 - [ ] **Step 7: Check for the canary**
 
-Search the harness transcript for the canary: for Claude Code, `grep -rl '<canary>' ~/.claude/projects/*sf-e2e*`; for OpenCode, its session storage directory. Expected: no match. Also `git -C ~/tmp/sf-e2e log -p | grep -c '<canary>'` prints 0.
+Search the transcript for the canary: `grep -rl '<canary>' ~/.claude/projects/<transcript directory>`. Expected: no match. Also `git -C <clone> log -p | grep -c '<canary>'` prints 0.
 
 - [ ] **Step 8: Organisation owner (when available)**
 
@@ -1887,7 +1889,7 @@ When the user administers a GitHub organisation, repeat only the github-app phas
 
 - [ ] **Step 9: Fix and repeat**
 
-For every problem seen (a wrong command, a missing check, the agent guessing), fix the prompt or card in `~/prj-other/software-factory`, run `pnpm --dir tools/check check`, commit, and repeat the run from a rebuilt server until one run passes without intervention beyond the human steps. Then record check 5 from the passing run: `ssh <ssh> 'free -m'` and, through the tunnel, `kubectl top pods -A`; write the recommended server size (the memory in use plus 4 GiB for one turn, rounded up to a Hetzner server type) into the spec's Check results and `hetzner-ssh.md`, and replace every card's `Tested with:` line with the versions and date of that run. Set the date of the `0.1.0-alpha.1` entry in `CHANGELOG.md` and commit.
+For every problem seen (a wrong command, a missing check, the agent guessing), fix the prompt or card in `~/prj-other/software-factory`, run `pnpm --dir tools/check check`, commit and push, and the user repeats the run from a fresh clone and a rebuilt server until one run passes without intervention beyond the human steps. Then record check 5 from the passing run: `ssh <ssh> 'free -m'` and, through the tunnel, `kubectl top pods -A`; write the recommended server size (the memory in use plus 4 GiB for one turn, rounded up to a Hetzner server type) into the spec's Check results and `hetzner-ssh.md`, and replace every card's `Tested with:` line with the versions and date of that run. Set the date of the `0.1.0-alpha.1` entry in `CHANGELOG.md` and commit.
 
 - [ ] **Step 10: Clean up the test resources**
 

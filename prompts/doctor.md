@@ -28,6 +28,7 @@ turn this clone into the user's private factory repository.
    | node 22+ | `node --version` | `brew install node@22` | https://github.com/nodesource/distributions |
    | pnpm | `pnpm --version` | `corepack enable pnpm` | `corepack enable pnpm` |
    | jq | `jq --version` | `brew install jq` | `sudo apt-get install -y jq` |
+   | curl | `curl --version` | built in | `sudo apt-get install -y curl` |
    | dig | `dig -v` | built in | `sudo apt-get install -y dnsutils` |
    | nc | `command -v nc` | built in | `sudo apt-get install -y netcat-openbsd` |
 
@@ -41,7 +42,8 @@ turn this clone into the user's private factory repository.
 5. When `.factory/state.json` records `phases.home`, skip to step 8.
    Otherwise ask the user who owns the factory repository (their account or
    an organisation they administer) and its name (default
-   `software-factory`; allowed characters `A-Z a-z 0-9 . _ -`). Check the
+   `<owner>-factory` in lower case; allowed characters `A-Z a-z 0-9 . _ -`;
+   never the name of the upstream repository). Check the
    owner type: `gh api users/<owner> -q .type` prints `User` or
    `Organization`.
 6. When `gh repo view <owner>/<name>` succeeds, the repository exists: ask

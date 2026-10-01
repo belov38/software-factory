@@ -27,10 +27,10 @@ describe('factory schema', () => {
     expect(validateDocument(repo, 'factory', parse(factory))).toEqual([])
   })
 
-  it('accepts opencode with openrouter', () => {
+  it('rejects a runtime agent other than claude', () => {
     const doc = parse(factory)
     doc.runtime.harness = { kind: 'opencode', provider: 'openrouter', models: { work: 'a/b', review: 'c/d' } }
-    expect(validateDocument(repo, 'factory', doc)).toEqual([])
+    expect(validateDocument(repo, 'factory', doc).join('\n')).toContain('/runtime/harness/kind must be equal to constant')
   })
 
   it('rejects an IPv6 server, a missing project list and an unknown key', () => {

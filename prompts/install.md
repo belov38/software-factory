@@ -48,13 +48,18 @@ Uses `integrations/sops-age.md`. `<name>` is `name` in `factory.yaml`.
 3. Write `.sops.yaml` as in the card, with the recipient from
    `age-keygen -y ~/.config/software-factory/<name>.agekey`.
 4. Create the env file `~/.config/software-factory/<name>.env` (mode 600)
-   with empty keys for the runtime agent in `factory.yaml`:
-   `claude` → `ANTHROPIC_API_KEY=` and `CLAUDE_CODE_OAUTH_TOKEN=` (the user
-   fills one of them and deletes the other line); `opencode` →
-   `OPENROUTER_API_KEY=`. Do not overwrite an existing file.
-5. Tell the user: open `~/.config/software-factory/<name>.env` in an editor,
-   fill in the value, save, and reply "done". Do not ask for the value in
-   chat.
+   with two empty keys, `CLAUDE_CODE_OAUTH_TOKEN=` and `ANTHROPIC_API_KEY=`.
+   Do not overwrite an existing file.
+5. Tell the user to fill in one of them and delete the other line, in an
+   editor, then reply "done":
+   - `CLAUDE_CODE_OAUTH_TOKEN`: with a Claude Pro or Max subscription, for
+     personal use. The user runs `claude setup-token` in a separate terminal
+     (not in this session: it prints the token) and pastes the token into
+     the file. It is valid for a year.
+   - `ANTHROPIC_API_KEY`: an Anthropic API key, for organisations.
+
+   Do not ask for the value in chat and do not run `claude setup-token`
+   yourself.
 6. Check without reading the value: `grep -cE '^[A-Z_]+=.+' <env-file>` is at
    least 1 and `grep -cE '^[A-Z_]+=$' <env-file>` is 0.
 7. `mkdir -p secrets` and encrypt the env file into
@@ -81,7 +86,7 @@ the script with `--check-only`.
    - serves `/` as an HTML page that posts the manifest to the creation URL
      for the owner type in `phases.home.ownerType` (user or organisation
      URL from the card) with a random `state`;
-   - uses this manifest: `name` `<name>-factory`, `url`
+   - uses this manifest: `name` `<name>`, `url`
      `https://github.com/<home.repo>`, `hook_attributes`
      `{ url: "https://<runtime.ingress.host>/webhooks/github", active: true }`,
      `redirect_url` `http://127.0.0.1:8765/callback`, `public: false`, and the

@@ -31,11 +31,8 @@ Ask the user for the factory's settings and write them to `factory.yaml`.
 3. Projects. Ask which GitHub repositories the factory will serve (at least
    one). For each, `gh repo view <owner>/<repo>` must succeed. Name each
    project after its repository in lower case.
-4. Runtime agent. Ask: `claude` (Claude Code; needs an Anthropic API key or a
-   Claude Code OAuth token) or `opencode` with OpenRouter (needs an
-   OpenRouter key). Ask for the model of work turns and of review turns;
-   suggest `opus` and `sonnet` for `claude`; for `opencode` ask for two
-   OpenRouter model ids.
+4. Models. Agent turns run Claude Code (`harness.kind: claude`). Ask for the
+   model of work turns and of review turns; suggest `opus` and `sonnet`.
 5. Limits. Suggest and confirm `concurrentTurns: 2`,
    `turnDeadlineSeconds: 3600`, `maxAgentTurns: 100`.
 6. Name. Suggest the repository name in lower case (pattern

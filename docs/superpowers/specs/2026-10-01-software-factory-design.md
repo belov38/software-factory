@@ -6,8 +6,7 @@ Status: draft
 ## Idea
 
 Software as a Prompt. The product is a public repository of prompts, not of
-code. A person clones it, opens their own coding agent in it (Claude Code,
-OpenCode or another harness that reads `AGENTS.md`), and the agent installs a
+code. A person clones it, opens Claude Code in it, and the agent installs a
 software factory on the person's infrastructure: it provisions the cluster,
 generates the factory's code into the person's private copy of the
 repository, deploys it through GitOps and checks it against acceptance
@@ -28,8 +27,8 @@ upgrade prompts.
 - A person with an existing Hetzner server (SSH access), a GitHub account and
   a domain name where they can add a DNS record runs the installer and gets a working factory that passes every acceptance
   check in `verify`.
-- The same prompts produce a passing factory with either runtime agent:
-  Claude Code (`claude -p`) or OpenCode with OpenRouter.
+- Agent turns run Claude Code (`claude -p`), with a Claude subscription token
+  from `claude setup-token` for personal use or an Anthropic API key.
 - The factory handles the loop: an issue asks for a change, an agent turn
   opens a draft pull request, an independent review turn reviews it, one
   revision round addresses unambiguous findings, the pull request goes to the
@@ -41,6 +40,8 @@ upgrade prompts.
 ## Non-goals for v1
 
 - Adapters other than GitHub.
+- Runtime agents other than Claude Code, and installing with another coding
+  agent; the harness port and `AGENTS.md` keep both open for later versions.
 - Triage, a spec stage with human approval, UI verification with computer
   use, a metrics dashboard (the ledger records the data from v1 on),
   self-improvement, hardening prompts.
@@ -58,7 +59,7 @@ upgrade prompts.
 | 2 | Product form | Prompts only: specification, integration cards, installer, verification and operation prompts. Code is generated per installation into the user's private repository. |
 | 3 | Reference profile | Existing Hetzner server over SSH, single-node k3s, GitHub for issues, conversation, pull requests and container images (ghcr). |
 | 4 | Capabilities in v1 | Core loop, independent review, feedback from pull requests (reviews and CI). |
-| 5 | Runtime agent | Chosen by the user per factory: `claude` (Claude Code CLI) or `opencode` with OpenRouter. |
+| 5 | Runtime agent | Claude Code (`claude -p`) only, behind the harness port. Model access: a Claude subscription token from `claude setup-token` (personal use) or an Anthropic API key (organisations). |
 | 6 | Stack of generated code | Fixed: TypeScript on Node 22, pnpm workspaces, Fastify, zod, vitest, `@kubernetes/client-node`, SQLite. |
 | 7 | GitOps | Flux, bootstrapped into the user's private repository, with SOPS and age for secrets. |
 | 8 | GitHub identity | A GitHub App created through the manifest flow; short-lived installation tokens per turn phase. |
@@ -72,8 +73,8 @@ upgrade prompts.
 
 ```
 software-factory/
-  AGENTS.md            entry for any harness: you install and operate a factory; start with prompts/doctor.md
-  CLAUDE.md            @AGENTS.md (Claude Code reads CLAUDE.md, OpenCode reads AGENTS.md)
+  AGENTS.md            entry for the coding agent: you install and operate a factory; start with prompts/doctor.md
+  CLAUDE.md            @AGENTS.md (Claude Code reads CLAUDE.md, which imports AGENTS.md)
   README.md, LICENSE
   CONTRIBUTING.md      how to change the prompts themselves
   VERSION              semver of the prompts
@@ -96,7 +97,7 @@ software-factory/
     integrations/      integration cards: verified facts, pitfalls, smoke tests
       hetzner-ssh.md  k3s.md  flux.md  sops-age.md  ingress.md
       github-app.md  github-issues.md  github-comments.md  ghcr.md
-      claude-cli.md  opencode-openrouter.md
+      claude-cli.md
     verify.md          acceptance checks against the running factory
     operate/
       upgrade.md  doctor-runtime.md  rotate-secrets.md  add-project.md  add-integration.md
@@ -145,7 +146,6 @@ runtime:
   server: { ssh: root@203.0.113.10 }
   ingress: { host: factory.acme.example, email: admin@acme.example }
   harness: { kind: claude, models: { work: opus, review: sonnet } }
-  # harness: { kind: opencode, provider: openrouter, models: { work: <id>, review: <id> } }
   limits: { concurrentTurns: 2, turnDeadlineSeconds: 3600, maxAgentTurns: 100 }
 projects:
   - name: shop
@@ -161,8 +161,8 @@ pull request itself instead of deriving them from naming conventions.
 
 ## Installation
 
-The user runs `git clone <upstream> && cd software-factory` and starts the
-harness. `AGENTS.md` tells it to start `doctor` when `.factory/state.json` is
+The user runs `git clone <upstream> && cd software-factory` and starts
+Claude Code. `AGENTS.md` tells it to start `doctor` when `.factory/state.json` is
 missing. Each phase is idempotent and records its result (never a secret
 value) in `.factory/state.json`, so an interrupted installation resumes.
 
@@ -186,7 +186,7 @@ a rule in the prompts; a later hardening prompt checks it.
 
 Human inputs, in full: a Hetzner server with the user's SSH key; a host name
 in the user's domain with an A record to the server, and an email for Let's
-Encrypt; `gh auth login`; a model key (Anthropic or OpenRouter); a token to pull images from
+Encrypt; `gh auth login`; a Claude subscription token or an Anthropic API key, written into a file; a token to pull images from
 ghcr (see Checks before writing prompts, item 2); two clicks for the GitHub
 App; a backup of the age key.
 
@@ -317,7 +317,7 @@ apps/factory/packages/
   turn/        Job entrypoints: checkout, context, streamer, agent, review, publisher
   adapters/
     forge-github/  tracker-github-issues/  channel-github-comments/
-    credentials-github-app/  harness-claude/  harness-opencode/  runner-k8s/
+    credentials-github-app/  harness-claude/  runner-k8s/
 ```
 
 `adapters/index.ts` maps each `kind` in `factory.yaml` to its module.
@@ -369,9 +369,6 @@ run({ sessionId, resume, prompt, cwd, mode: 'work' | 'review', model, maxTurns, 
   `--permission-mode acceptEdits`, `--agents`; transcripts in
   `CLAUDE_CONFIG_DIR` on the sessions PVC. Background subagents emit several
   `result` events; the last one is the answer.
-- `harness-opencode`: `opencode run` with JSON output and session
-  continuation, the OpenRouter provider and tool permissions in its config,
-  session storage on the sessions PVC.
 - Modes: `work` may read, edit, run commands, keep a task list and start
   subagents; `review` has the same tools, but only its findings leave the Job.
 
@@ -431,7 +428,6 @@ installation, after every upgrade, and on demand.
 | ISOLATION-3 | The publisher refuses a push outside `factory/`. |
 | ISOLATION-4 | A canary secret placed in the agent's environment appears redacted if the agent prints it. |
 | ISOLATION-5 | The Kubernetes API is not reachable from the internet. |
-| HARNESS-1 | CORE, REVIEW and FEEDBACK pass for each harness configured in `factory.yaml`. |
 
 ## Upgrades and operation
 
@@ -452,8 +448,7 @@ installation, after every upgrade, and on demand.
 ## Developing this project
 
 - The prompts are written first; then the installer runs on a real Hetzner
-  server and sandbox account, and the prompts change until `verify` passes,
-  once with each harness.
+  server and sandbox account, and the prompts change until `verify` passes.
 - CI of the upstream repository is cheap: markdown links, JSON and YAML
   examples against their schemas, every acceptance id referenced from a
   capability exists in `verify.md`. The end-to-end run is manual.
@@ -465,8 +460,9 @@ installation, after every upgrade, and on demand.
 
 Each is verified first; a different outcome changes this document.
 
-1. OpenCode headless mode: JSON event stream, continuing a session, tool
-   permissions in config, OpenRouter provider configuration.
+1. Claude Code headless in a container: `claude -p` with `stream-json`,
+   resuming a session from `CLAUDE_CONFIG_DIR` on a volume, and
+   authentication with `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`.
 2. Pulling private images from ghcr: whether a fine-grained token can read
    packages; otherwise a classic token with `read:packages`.
 3. GitHub App manifest flow with a `localhost` redirect.

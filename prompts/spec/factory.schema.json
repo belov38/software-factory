@@ -37,24 +37,10 @@
           }
         },
         "harness": {
-          "oneOf": [
-            {
-              "type": "object",
-              "required": ["kind", "models"],
-              "additionalProperties": false,
-              "properties": { "kind": { "const": "claude" }, "models": { "$ref": "#/$defs/models" } }
-            },
-            {
-              "type": "object",
-              "required": ["kind", "provider", "models"],
-              "additionalProperties": false,
-              "properties": {
-                "kind": { "const": "opencode" },
-                "provider": { "const": "openrouter" },
-                "models": { "$ref": "#/$defs/models" }
-              }
-            }
-          ]
+          "type": "object",
+          "required": ["kind", "models"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "claude" }, "models": { "$ref": "#/$defs/models" } }
         },
         "limits": {
           "type": "object",
