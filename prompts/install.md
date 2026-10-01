@@ -244,7 +244,7 @@ Uses `integrations/flux.md`, `integrations/sops-age.md` and
      `dependsOn: [infra-config, secrets]`, `wait: true`).
 8. Commit and push, then `.factory/bin/kube flux reconcile source git flux-system`
    and wait up to 10 minutes until `.factory/bin/kube flux get kustomizations -A`
-   shows every row Ready.
+   shows every row Ready (INSTALL-1).
 9. Wait until `.factory/bin/kube kubectl -n factory get certificate` shows
    `factory-tls` Ready.
 10. Record `fluxVersion` (`flux --version`) and `certManagerVersion`.
@@ -258,8 +258,9 @@ cards under `integrations/`. `<owner>` is the owner of `home.repo`.
    `gh repo create <owner>/factory-sandbox --private --add-readme`. In a
    scratch clone outside this repository, add a small TypeScript library: a
    `package.json` with vitest, `src/sum.ts` exporting `sum(a, b)`,
-   `src/sum.test.ts`, and `.github/workflows/ci.yml` running the tests on
-   pushes and pull requests; push it to `main`.
+   `src/sum.test.ts`, and `.github/workflows/ci.yml` that runs on pushes and
+   pull requests, runs the tests and then `! grep -rn TODO src` (FEEDBACK-2
+   relies on it); push it to `main`.
 2. Ask the user to add `factory-sandbox` to the App's installation at
    `https://github.com/apps/<appSlug>/installations/new` (configure, select
    the repository, save), and wait until
@@ -304,7 +305,9 @@ Uses `integrations/ghcr.md`, `integrations/flux.md` and
 3. `.factory/bin/kube flux reconcile source git flux-system`, then wait up to
    10 minutes until `.factory/bin/kube flux get helmreleases -n factory`
    shows `factory` Ready and `curl -fsS --max-time 10 https://<host>/healthz`
-   prints `{"ok":true}`. On `ImagePullBackOff`, see the ghcr card's Pitfalls.
+   prints `{"ok":true}` (INSTALL-2). On `ImagePullBackOff`, see the ghcr
+   card's Pitfalls. From now on the App's webhook deliveries reach the
+   controller (INSTALL-3).
 4. Record `imageTag`.
 
 ### Phase verify

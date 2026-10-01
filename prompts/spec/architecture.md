@@ -72,8 +72,8 @@ The build phase in `prompts/install.md` generates everything described here.
       the event afterwards.
     - `GET /healthz`: `200` with `{"ok":true}` when the ledger is open.
     - `GET /s/:turn`: an HTML status page for one turn: project, work item
-      link, turn kind and state, plan, current action, pull request link. No
-      logs and no transcript. `404` for an unknown id. Turn ids are random
+      link, session id and state, turn kind and state, plan, current action,
+      pull request link. No logs and no transcript. `404` for an unknown id. Turn ids are random
       UUIDs, so the page cannot be guessed.
     - `GET /internal/turns/:id`, `POST /internal/credentials` and
       `POST /internal/turns/:id/result`, for turn containers only
