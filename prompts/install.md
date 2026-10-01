@@ -39,11 +39,79 @@ prompts (`git merge upstream/main`).
 
 ### Phase secrets
 
-(Task 10)
+Uses `integrations/sops-age.md`. `<name>` is `name` in `factory.yaml`.
+
+1. `mkdir -p ~/.config/software-factory && chmod 700 ~/.config/software-factory`
+2. When `~/.config/software-factory/<name>.agekey` does not exist:
+   `age-keygen -o ~/.config/software-factory/<name>.agekey && chmod 600 ~/.config/software-factory/<name>.agekey`.
+   Never overwrite an existing key.
+3. Write `.sops.yaml` as in the card, with the recipient from
+   `age-keygen -y ~/.config/software-factory/<name>.agekey`.
+4. Create the env file `~/.config/software-factory/<name>.env` (mode 600)
+   with empty keys for the runtime agent in `factory.yaml`:
+   `claude` → `ANTHROPIC_API_KEY=` and `CLAUDE_CODE_OAUTH_TOKEN=` (the user
+   fills one of them and deletes the other line); `opencode` →
+   `OPENROUTER_API_KEY=`. Do not overwrite an existing file.
+5. Tell the user: open `~/.config/software-factory/<name>.env` in an editor,
+   fill in the value, save, and reply "done". Do not ask for the value in
+   chat.
+6. Check without reading the value: `grep -cE '^[A-Z_]+=.+' <env-file>` is at
+   least 1 and `grep -cE '^[A-Z_]+=$' <env-file>` is 0.
+7. `mkdir -p secrets` and encrypt the env file into
+   `secrets/factory-model.sops.yaml` (Secret `factory-model`, namespace
+   `factory`) with the command in the card.
+8. Check: `grep -c 'ENC\[' secrets/factory-model.sops.yaml` is at least 1 and
+   `SOPS_AGE_KEY_FILE=~/.config/software-factory/<name>.agekey sops --decrypt secrets/factory-model.sops.yaml > /dev/null`
+   succeeds.
+9. Tell the user to back up `~/.config/software-factory/<name>.agekey` now
+   (a password manager): without it every secret must be created again.
+10. Commit `.sops.yaml` and `secrets/`. Record `ageRecipient`.
 
 ### Phase github-app
 
-(Task 10)
+Uses `integrations/github-app.md`.
+
+When `secrets/github-app.sops.yaml` already exists, the App was created by an
+earlier, interrupted run: do not create another one. Skip to step 3 and run
+the script with `--check-only`.
+
+1. Write `.factory/bin/github-app.mjs`, a Node script without dependencies
+   that:
+   - listens on `127.0.0.1:8765`;
+   - serves `/` as an HTML page that posts the manifest to the creation URL
+     for the owner type in `phases.home.ownerType` (user or organisation
+     URL from the card) with a random `state`;
+   - uses this manifest: `name` `<name>-factory`, `url`
+     `https://github.com/<home.repo>`, `hook_attributes`
+     `{ url: "https://<runtime.ingress.host>/webhooks/github", active: true }`,
+     `redirect_url` `http://127.0.0.1:8765/callback`, `public: false`, and the
+     permissions and events from the card;
+   - on `/callback` checks `state`, converts the code, redirects the browser
+     to `https://github.com/apps/<slug>/installations/new`;
+   - pipes a Secret manifest `github-app` (namespace `factory`, `stringData`:
+     `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`,
+     `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`) into
+     `sops --encrypt --filename-override secrets/github-app.sops.yaml --input-type yaml --output-type yaml /dev/stdin`
+     (the creation rule in `.sops.yaml` supplies the recipient; see the sops
+     card) and writes the result to `secrets/github-app.sops.yaml`; the
+     plaintext exists only in the script's memory;
+   - then polls `GET /app/installations` with an App JWT every 5 seconds,
+     for at most 10 minutes, until one exists; lists its repositories with an
+     installation token;
+   - prints only `appId`, `slug`, the installation account and the
+     repository names, and exits 0; exits 1 with a message on any error.
+2. Start it in the background and tell the user: open
+   `http://127.0.0.1:8765/`, check the name, click "Create GitHub App", then
+   on the next page choose the project repositories and click "Install".
+3. Wait for the script to exit. Every project repository in `factory.yaml`
+   must be in its list; when one is missing, ask the user to add it at
+   `https://github.com/apps/<slug>/installations/new` and run the check
+   again (the script can be run with `--check-only` to skip creation: it then
+   reads the App id and key from `secrets/github-app.sops.yaml` via
+   `sops --decrypt` inside the script, with `SOPS_AGE_KEY_FILE` set to the age
+   key file).
+4. Commit `.factory/bin/github-app.mjs` and `secrets/github-app.sops.yaml`.
+   Record `appId` and `appSlug`.
 
 ### Phase server
 
