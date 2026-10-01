@@ -10,7 +10,7 @@ App; the factory itself arrives in a later version.
 
 ## What you need
 
-- A Hetzner server with 4 CPU and 16 GB of memory.
+- A Hetzner server with 4 CPU and 16 GB of memory (depends on your workload).
 - A host name in a domain you control, for example `factory.example.com`.
   You add its DNS A record when the installer asks: DNS only (in Cloudflare,
   proxy off), and no AAAA record.

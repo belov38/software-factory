@@ -6,9 +6,9 @@ Tested with: Ubuntu 24.04, pending the end-to-end run (2026-10-01).
 
 - The installer uses an existing server: Hetzner Cloud, or a dedicated server
   from Hetzner Robot, with Ubuntu 24.04 or Debian 12.
-- Recommended size: an x86 server with 4 CPU and 16 GB of memory. Besides
-  k3s, Flux and cert-manager, the factory runs agent turns: Claude Code with
-  the project's builds and tests.
+- Recommended size: an x86 server with 4 CPU and 16 GB of memory; how much
+  more depends on the workload. Besides k3s, Flux and cert-manager, the
+  factory runs agent turns: Claude Code with the project's builds and tests.
 - Login is `root` with the SSH key chosen when the server was created. The
   installer needs key login without a password prompt:
   `ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new <user>@<ip> true`
@@ -45,5 +45,6 @@ ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 <u
 ```
 
 Expected: `ID=ubuntu` with `VERSION_ID="24.04"` (or `ID=debian` with
-`VERSION_ID="12"`), `x86_64`, at least 4 CPUs and about 15 GB of total
-memory or more.
+`VERSION_ID="12"`), `x86_64`, at least 4 CPUs, and a total memory of
+15000 MB or more: `free -m` shows a little less than the 16 GB of the
+server type, because the kernel and firmware reserve some.
