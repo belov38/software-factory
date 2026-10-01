@@ -101,7 +101,9 @@ The build phase in `prompts/install.md` generates everything described here.
 
 13. The Helm chart `deploy/charts/factory` renders, in the namespace
     `factory`:
-    - Deployment `factory-controller`: 1 replica, strategy `Recreate` (the
+    - Deployment `factory-controller`, its pods labelled
+      `app.kubernetes.io/name: factory-controller` (the turn NetworkPolicy
+      selects them): 1 replica, strategy `Recreate` (the
       ledger is SQLite on a ReadWriteOnce volume), service account
       `factory-controller`, the PVC `factory-ledger` at `/var/lib/factory`,
       the ConfigMap `factory-config` at `/etc/factory`, environment from 8,
