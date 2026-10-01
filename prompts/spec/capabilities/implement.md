@@ -64,9 +64,9 @@ Core unit tests with fakes of the ports, one per scenario:
 - A question in an issue: one work turn, the answer is said, no change is
   opened (CORE-1).
 - A mention gets `ack` before the turn is queued (CORE-2).
-- A turn's progress calls reuse one comment id (CORE-3).
-- A turn that changed files: a draft is opened whose body ends with
-  `Closes #<n>`, and a review turn is queued (CORE-4).
+- A turn that changed files: the change is recorded as a draft and a review
+  turn is queued (CORE-4; the body with `Closes #<n>` and the single status
+  comment of CORE-3 are tested in `prompts/spec/ports/runner.md`).
 - A final message with QUESTION and OPTIONS, then a reply `1`: the second
   turn's input names the first option (CORE-5).
 - A follow-up after a finished turn: the second turn resumes the same

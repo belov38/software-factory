@@ -269,8 +269,8 @@ cards under `integrations/`. `<owner>` is the owner of `home.repo`.
    the same kinds as the other projects), check the file against its schema
    and commit.
 4. Generate `apps/factory` as `prompts/spec/architecture.md` describes, one
-   component per commit, in this order: contracts, core, each adapter, turn,
-   controller. Each component comes with the tests that its spec file lists
+   component per commit, in this order: contracts, core, each adapter,
+   registry, turn, controller. Each component comes with the tests that its spec file lists
    under `## Tests`. Before each commit, `pnpm --dir apps/factory install`,
    `pnpm --dir apps/factory -r typecheck` and `pnpm --dir apps/factory -r test`
    pass.

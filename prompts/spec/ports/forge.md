@@ -35,16 +35,18 @@ events.
 3. Only branches under `factory/` are the factory's: events about other
    pull requests produce nothing.
 4. `openDraft` creates a draft pull request against the repository's default
-   branch. Its body is the work turn's summary, "What changed", "Test plan"
-   and the line `Closes #<issue number>` (CORE-4).
+   branch with the body it is given; the publisher gives the work turn's
+   final message followed by `Closes #<issue number>` (CORE-4,
+   `prompts/spec/ports/runner.md`).
 5. `markReady` uses the GraphQL mutation `markPullRequestReadyForReview`; the
    REST API has no such call.
 6. `postReview` posts a review with `event: COMMENT`, never `APPROVE` or
    `REQUEST_CHANGES`: the App opened the pull request and GitHub refuses those
    from its author. The body starts with `Verdict: <verdict>`, then the
    summary, then every finding that has no line in the diff. Findings with a
-   `file` and `line` on an added or changed line of the diff become inline
-   comments (side `RIGHT`). Each finding shows its severity and, when
+   `file` and `line` on a line the diff shows (an added or a context line of
+   a hunk, from `GET /repos/{owner}/{repo}/pulls/{number}/files`) become
+   inline comments (side `RIGHT`). Each finding shows its severity and, when
    `needsHuman` is true, "needs a human decision".
 7. `checkLog` returns the last 200 lines of the failing job's log, at most
    20000 characters, from
@@ -54,20 +56,22 @@ events.
    - `pull_request` `closed`: `change.merged` (`merged: true`) or
      `change.closed`, `deliveryId: pr:<repo>#<number>:merged` or `…:closed`;
    - `pull_request_review` `submitted`: `change.review_submitted` with
-     `isBot` true when the reviewer is a bot, the review's comments, and
-     `deliveryId: review:<id>`;
+     `isBot` true when the reviewer is a bot, the review's `body`, an empty
+     `comments` list and `deliveryId: review:<id>`;
    - `check_run` `completed` with conclusion `failure` or `timed_out` on the
-     head of a factory pull request: `change.checks_failed` with the log
-     excerpt and `deliveryId: check:<id>:<conclusion>` (FEEDBACK-2).
-9. `poll` reads, for each open change, its reviews and the check runs of its
-   head commit, with `If-None-Match`, and emits what 8 would emit.
+     head of a factory pull request: `change.checks_failed` with an empty
+     `logExcerpt` and `deliveryId: check:<id>:<conclusion>` (FEEDBACK-2).
+   `fromWebhook` makes no calls; the core fills the comments with
+   `reviewThreads` and the excerpt with `checkLog`.
+9. `poll` reads, for each open change, the pull request, its reviews and the
+   check runs of its head commit, with `If-None-Match`, and emits what 8
+   would emit, including a merge or close that no webhook delivered.
 
 ## Tests
 
 - Unit: `postReview` sends `event: COMMENT`; a finding on a line in the diff
   becomes an inline comment, a finding outside the diff goes into the body;
   the body starts with the verdict.
-- Unit: the draft's body ends with `Closes #<n>`.
 - Unit: events about a branch outside `factory/` produce nothing.
 - Unit: a failed check on a commit that is not the head of a factory pull
   request produces nothing.

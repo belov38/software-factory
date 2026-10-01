@@ -23,9 +23,11 @@ pull request, and the merge ends the session.
    runs:
    - human review: "A reviewer asked for changes. Address every comment and,
      in your final message, say what you did about each.";
+   - a human comment on the pull request: "A comment on the pull request asks
+     for changes. Address it and say what you did in your final message.";
    - CI: "The check <name> failed on your last commit. Fix the cause; do not
      weaken or skip the test.";
-   followed by the review or the log excerpt.
+   followed by the review, the comment or the log excerpt.
 
 ## Tests
 

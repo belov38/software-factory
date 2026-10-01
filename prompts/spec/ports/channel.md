@@ -24,11 +24,12 @@ into canonical events.
    //             phase: 'working' | 'done' | 'stopped' | 'failed'; statusUrl: string }
    ```
 
-2. The core adapts to the capabilities: without `selectOptions` a question
-   lists numbered options and says that a number or free text is a valid
-   answer; without `editableProgress` progress is posted only when the plan
-   changes; without `reactions` `ack` posts a short comment; a message longer
-   than `maxLength` is cut, ending with a link to the turn's status page.
+2. The adapter renders what it gets for its channel: without
+   `selectOptions` a question lists numbered options (6); without
+   `editableProgress` progress is posted only when the plan changes; without
+   `reactions` `ack` posts a short comment. The core cuts messages longer
+   than `maxLength` before calling `say` (`prompts/spec/core.md`). Adapters
+   are built per project and know their project and repository.
 3. `channel-github-comments` (`kind: github-comments`): `nativeSession:
    false`, `selectOptions: false`, `editableProgress: true`, `reactions:
    true`, `maxLength: 65536`.
@@ -45,14 +46,15 @@ into canonical events.
 7. `fromWebhook('issue_comment', …)` for `created` comments only (edits are
    ignored), with `deliveryId: comment:<id>`:
    - by the App itself: nothing;
-   - containing `@<app-slug> stop`: `work.stopped` (CORE-7);
+   - containing `@<app-slug> stop`, by the same rules as a mention:
+     `work.stopped` (CORE-7);
    - containing a mention (as in the tracker port): `work.requested`;
    - otherwise: `work.replied`.
    The comment may be on an issue or on a pull request; the core decides what
    it belongs to.
-8. `poll` lists `GET /repos/{owner}/{repo}/issues/comments?since=<cursor>&sort=updated&direction=asc`
-   with `If-None-Match`, keeps comments created after the cursor and emits
-   what 7 would emit.
+8. `poll` lists `GET /repos/{owner}/{repo}/issues/comments?since=<cursor>&sort=updated&direction=asc&per_page=100`
+   with `If-None-Match`, follows the `Link` header's next pages, keeps
+   comments created after the cursor and emits what 7 would emit.
 
 ## Tests
 
@@ -60,7 +62,5 @@ into canonical events.
   `work.requested` and `work.replied`; the App's own comment maps to nothing.
 - Unit: a question with three options renders the numbered list with the
   first marked as recommended.
-- Unit: a 70000-character answer is cut below 65536 characters and ends with
-  the status link.
 - Contract (sandbox): `ack` puts 👀 on a comment; two `progress` calls leave
   one comment whose body changed; `say` adds one comment.

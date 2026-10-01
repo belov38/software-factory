@@ -12,16 +12,20 @@ The build phase in `prompts/install.md` generates everything described here.
 ### Workspace
 
 1. `apps/factory` is a pnpm workspace: a private root `package.json` with
-   `"type": "module"`, `engines.node` `>=22.13`, a `packageManager` field,
-   and the scripts `build` (`tsc -b`), `typecheck` (`tsc -b --noEmit` or an
-   equivalent), `test` (`vitest run`, unit tests only) and `test:contract`
-   (contract tests, see 22). `pnpm-workspace.yaml` lists `packages/*` and
-   `packages/adapters/*`.
+   `"type": "module"`, `engines.node` `>=22.13` and a `packageManager`
+   field; `pnpm-workspace.yaml` lists `packages/*` and
+   `packages/adapters/*`; `apps/factory/.gitignore` ignores `node_modules`,
+   `dist` and `*.tsbuildinfo`. Every package has the scripts `build` and
+   `typecheck` (both `tsc -b`, which writes the ignored `dist`: `--noEmit`
+   cannot be combined with project references), `test` (`vitest run`, unit
+   tests only) and `test:contract` (contract tests, see 22). `pnpm -r` runs
+   the packages' scripts, not the root's.
 2. The packages:
 
    | Package | Path | Responsibility |
    |---|---|---|
-   | `@factory/contracts` | `packages/contracts` | zod schemas of events, commands, findings, configuration; the port interfaces |
+   | `@factory/contracts` | `packages/contracts` | zod schemas of events, findings, configuration and the bodies of the `/internal` routes; the port interfaces |
+   | `@factory/registry` | `packages/registry` | maps each `kind` to its adapter and builds one set of adapters per project |
    | `@factory/core` | `packages/core` | ledger, sessions, queue, turn planning, loop limits, catch-up poll (`prompts/spec/core.md`) |
    | `@factory/controller` | `packages/controller` | the HTTP server and the process that runs the core |
    | `@factory/turn` | `packages/turn` | the steps of a turn Job (`prompts/spec/ports/runner.md`) |
@@ -34,21 +38,31 @@ The build phase in `prompts/install.md` generates everything described here.
 
 3. TypeScript is strict, `module` and `moduleResolution` are `NodeNext`, each
    package is a composite project with `outDir: dist`, and the root
-   `tsconfig.json` references them all.
+   `tsconfig.json` references them all. Each package's `exports` has the
+   condition `"@factory/source": "./src/index.ts"` before `default`, and
+   vitest resolves that condition, so tests run from the sources without a
+   build.
 4. Dependencies are the current releases when the code is generated:
    `fastify`, `zod`, `@kubernetes/client-node` and `yaml`; for development
-   `typescript`, `vitest` and `@types/node`. Nothing needs a native build:
-   SQLite is `node:sqlite` (`DatabaseSync`). Other dependencies only where a
-   requirement needs them.
+   `typescript`, `vitest`, `vite` (vitest's peer) and `@types/node`, one
+   version of it in the whole workspace, the one `@kubernetes/client-node`
+   needs. Nothing needs a native build: SQLite is `node:sqlite`
+   (`DatabaseSync`), which prints an `ExperimentalWarning` on Node 22, so
+   the images start Node with `--disable-warning=ExperimentalWarning`. Other
+   dependencies only where a requirement needs them.
 5. Every value that crosses a package boundary or the network is parsed with
    a zod schema from `@factory/contracts` before use. The schemas of events,
    review findings and the configuration match `events.schema.json`,
    `findings.schema.json` and `factory.schema.json` in `prompts/spec/`.
-6. `packages/adapters/index.ts` maps each `kind` in `factory.yaml` to its
-   module: forge `github`, tracker `github-issues`, channel
-   `github-comments`, harness `claude`. Credentials (GitHub App) and runner
-   (Kubernetes) have one implementation each. An unknown kind stops the
-   controller at start with a message that names it.
+6. `@factory/registry` maps each `kind` in `factory.yaml` to its module:
+   forge `github`, tracker `github-issues`, channel `github-comments`,
+   harness `claude`. Credentials (GitHub App) and runner (Kubernetes) have
+   one implementation each. It builds the adapters once per project; each
+   adapter knows its project and its repository from its binding (`repo`).
+   The controller routes a webhook to the project whose repository is the
+   payload's `repository.full_name`. The schema already limits the kinds; a
+   kind the registry does not know still stops the controller at start with
+   a message that names it.
 
 ### Configuration
 
@@ -60,7 +74,8 @@ The build phase in `prompts/install.md` generates everything described here.
    tag, from the chart's values), `FACTORY_INTERNAL_URL`
    (`http://factory-controller.factory.svc:8080`) and `FACTORY_PUBLIC_URL`
    (`https://<runtime.ingress.host>`). The App's slug comes from `GET /app` at
-   start.
+   start, and the bot's commit address `<id>+<slug>[bot]@users.noreply.github.com`
+   from the id that `GET /users/<slug>[bot]` returns.
 
 ### Controller
 
@@ -75,9 +90,11 @@ The build phase in `prompts/install.md` generates everything described here.
       link, session id and state, turn kind and state, plan, current action,
       pull request link. No logs and no transcript. `404` for an unknown id. Turn ids are random
       UUIDs, so the page cannot be guessed.
-    - `GET /internal/turns/:id`, `POST /internal/credentials` and
-      `POST /internal/turns/:id/result`, for turn containers only
-      (`prompts/spec/ports/credentials.md`, `prompts/spec/ports/runner.md`).
+    - `GET /internal/turns/:id`, `POST /internal/turns/:id/progress`,
+      `POST /internal/turns/:id/result` and `POST /internal/credentials`,
+      for turn containers only, authenticated with the header
+      `x-factory-nonce` (`prompts/spec/ports/runner.md`,
+      `prompts/spec/ports/credentials.md`).
 11. The Ingress routes only `/webhooks/github`, `/s/` and `/healthz` to the
     controller; `/internal` is reachable only inside the cluster.
 
@@ -88,8 +105,8 @@ The build phase in `prompts/install.md` generates everything described here.
       the current `node:22-slim`, with `git` and `ca-certificates` from apt,
       the workspace installed with `pnpm install --frozen-lockfile` and built
       with `pnpm -r build`, development dependencies removed, user `node`.
-      `ENTRYPOINT ["node"]`, default command
-      `packages/controller/dist/main.js`. Turn steps run
+      `ENTRYPOINT ["node", "--disable-warning=ExperimentalWarning"]`, default
+      command `packages/controller/dist/main.js`. Turn steps run
       `packages/turn/dist/main.js <step>`.
     - `ghcr.io/<owner>/<repo>/agent:<sha7>` (`Dockerfile.agent`): `FROM` the
       factory image (build argument `FACTORY_IMAGE`), adds `curl`, `jq`,
@@ -165,19 +182,21 @@ The build phase in `prompts/install.md` generates everything described here.
 22. Contract tests (`*.contract.test.ts`) run against `<owner>/factory-sandbox`
     with the App's credentials and are excluded from `pnpm -r test`;
     `pnpm -r test:contract` runs them.
-23. The build phase commits one component per commit: contracts, core, each
-    adapter, controller, turn, Dockerfiles, chart and releases, workflow.
+23. The build phase commits one component per commit, in this order:
+    contracts, core, each adapter, registry, turn, controller, then the
+    Dockerfiles, the chart and the workflow.
 
 ## Tests
 
 - From a clean clone, `pnpm install --frozen-lockfile`, `pnpm -r typecheck`
   and `pnpm -r test` pass.
-- `adapters/index.ts` resolves every kind in the `factory.yaml` example of
+- `@factory/registry` resolves every kind in the `factory.yaml` example of
   `prompts/interview.md` and refuses an unknown kind with its name.
 - The configuration parser refuses a `factory.yaml` that does not match
   `factory.schema.json`.
 - The webhook route answers `401` for a wrong signature and `202` for a
   right one; `/internal/credentials` answers `403` for a wrong nonce.
-- `helm template deploy/charts/factory` renders; no Ingress path starts with
-  `/internal`; the controller's strategy is `Recreate`; the NetworkPolicy
-  `factory-turns` is present.
+- In build step 6, once the chart exists: `helm template deploy/charts/factory`
+  renders; no Ingress path starts with `/internal`; the controller's
+  strategy is `Recreate`; the NetworkPolicy `factory-turns` matches
+  `prompts/spec/ports/runner.md`.

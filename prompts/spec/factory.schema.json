@@ -3,80 +3,203 @@
   "$id": "factory.schema.json",
   "title": "factory.yaml",
   "type": "object",
-  "required": ["name", "home", "runtime", "projects"],
+  "required": [
+    "name",
+    "home",
+    "runtime",
+    "projects"
+  ],
   "additionalProperties": false,
   "properties": {
-    "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$" },
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$"
+    },
     "home": {
       "type": "object",
-      "required": ["forge", "repo"],
+      "required": [
+        "forge",
+        "repo"
+      ],
       "additionalProperties": false,
       "properties": {
-        "forge": { "const": "github" },
-        "repo": { "type": "string", "pattern": "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$" }
+        "forge": {
+          "const": "github"
+        },
+        "repo": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$"
+        }
       }
     },
     "runtime": {
       "type": "object",
-      "required": ["server", "ingress", "harness", "limits"],
+      "required": [
+        "server",
+        "ingress",
+        "harness",
+        "limits"
+      ],
       "additionalProperties": false,
       "properties": {
         "server": {
           "type": "object",
-          "required": ["ssh"],
+          "required": [
+            "ssh"
+          ],
           "additionalProperties": false,
-          "properties": { "ssh": { "type": "string", "pattern": "^[a-z_][a-z0-9_-]*@(\\d{1,3}\\.){3}\\d{1,3}$" } }
+          "properties": {
+            "ssh": {
+              "type": "string",
+              "pattern": "^[a-z_][a-z0-9_-]*@(\\d{1,3}\\.){3}\\d{1,3}$"
+            }
+          }
         },
         "ingress": {
           "type": "object",
-          "required": ["host", "email"],
+          "required": [
+            "host",
+            "email"
+          ],
           "additionalProperties": false,
           "properties": {
-            "host": { "type": "string", "pattern": "^([a-z0-9]([a-z0-9-]*[a-z0-9])?\\.)+[a-z][a-z0-9-]*[a-z0-9]$" },
-            "email": { "type": "string", "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$" }
+            "host": {
+              "type": "string",
+              "pattern": "^([a-z0-9]([a-z0-9-]*[a-z0-9])?\\.)+[a-z][a-z0-9-]*[a-z0-9]$"
+            },
+            "email": {
+              "type": "string",
+              "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+            }
           }
         },
         "harness": {
           "type": "object",
-          "required": ["kind", "models"],
+          "required": [
+            "kind",
+            "models"
+          ],
           "additionalProperties": false,
-          "properties": { "kind": { "const": "claude" }, "models": { "$ref": "#/$defs/models" } }
+          "properties": {
+            "kind": {
+              "const": "claude"
+            },
+            "models": {
+              "$ref": "#/$defs/models"
+            }
+          }
         },
         "limits": {
           "type": "object",
-          "required": ["concurrentTurns", "turnDeadlineSeconds", "maxAgentTurns"],
+          "required": [
+            "concurrentTurns",
+            "turnDeadlineSeconds",
+            "maxAgentTurns"
+          ],
           "additionalProperties": false,
           "properties": {
-            "concurrentTurns": { "type": "integer", "minimum": 1, "maximum": 20 },
-            "turnDeadlineSeconds": { "type": "integer", "minimum": 300, "maximum": 14400 },
-            "maxAgentTurns": { "type": "integer", "minimum": 10, "maximum": 500 }
+            "concurrentTurns": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "turnDeadlineSeconds": {
+              "type": "integer",
+              "minimum": 300,
+              "maximum": 14400
+            },
+            "maxAgentTurns": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 500
+            }
           }
         }
       }
     },
-    "projects": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/project" } }
+    "projects": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/project"
+      }
+    }
   },
   "$defs": {
     "models": {
       "type": "object",
-      "required": ["work", "review"],
+      "required": [
+        "work",
+        "review"
+      ],
       "additionalProperties": false,
-      "properties": { "work": { "type": "string", "minLength": 1 }, "review": { "type": "string", "minLength": 1 } }
+      "properties": {
+        "work": {
+          "type": "string",
+          "minLength": 1
+        },
+        "review": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     },
     "binding": {
       "type": "object",
-      "required": ["kind"],
-      "properties": { "kind": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" } }
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        }
+      }
     },
     "project": {
       "type": "object",
-      "required": ["name", "forge", "tracker", "channels"],
+      "required": [
+        "name",
+        "forge",
+        "tracker",
+        "channels"
+      ],
       "additionalProperties": false,
       "properties": {
-        "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-        "forge": { "$ref": "#/$defs/binding" },
-        "tracker": { "$ref": "#/$defs/binding" },
-        "channels": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/binding" } }
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "forge": {
+          "$ref": "#/$defs/repoBinding"
+        },
+        "tracker": {
+          "$ref": "#/$defs/repoBinding"
+        },
+        "channels": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/binding"
+          }
+        }
+      }
+    },
+    "repoBinding": {
+      "type": "object",
+      "required": [
+        "kind",
+        "repo"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "repo": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$"
+        }
       }
     }
   }

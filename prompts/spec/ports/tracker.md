@@ -22,6 +22,9 @@ the item's status in step with the factory where the tracker supports it.
    // WorkRef: { kind: 'github-issue', repo, number }
    // WorkItem: { ref, title, body, url, author: { login, isBot }, labels: string[],
    //             state: 'open' | 'closed', comments: { id, author, body, createdAt }[] }
+   // Project: one entry of `projects` in factory.yaml.
+   // Cursor: { since: string; etag: Record<string, string> } (one ETag per URL),
+   //         stored in the ledger's `cursors` table.
    ```
 
 2. Without `webhooks`, the core relies on `poll` alone. Without `statusSync`,
@@ -36,12 +39,17 @@ the item's status in step with the factory where the tracker supports it.
    - `labeled` with the label `factory`: `work.requested` with
      `deliveryId: issue:<repo>#<number>:labeled:factory`;
    - everything else, and anything the App itself did: no event.
+   An issue opened with a mention and the label yields both events; the core
+   starts one turn (`prompts/spec/core.md`). A label event found by `poll`
+   names the issue's author as `by`, because the list does not say who added
+   the label.
 5. A mention is `@<app-slug>`, case-insensitive, outside fenced code blocks,
    inline code and quoted lines (`>`).
-6. `poll` lists `GET /repos/{owner}/{repo}/issues?state=all&sort=updated&direction=asc&since=<cursor>`
-   with `If-None-Match`, and emits for each issue the events 4 would emit
-   (pull requests in that list are skipped). The new cursor is the latest
-   `updated_at` seen.
+6. `poll` lists `GET /repos/{owner}/{repo}/issues?state=all&sort=updated&direction=asc&since=<cursor>&per_page=100`
+   with `If-None-Match`, follows the `Link` header's next pages, and emits
+   for each issue the events 4 would emit (pull requests in that list are
+   skipped). The new cursor is the latest `updated_at` seen. Adapters are
+   built per project and know their project and repository.
 7. `getWorkItem` reads the issue and all its comments; the App's own
    comments are included with `isBot: true`.
 
