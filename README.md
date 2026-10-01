@@ -10,8 +10,7 @@ App; the factory itself arrives in a later version.
 
 ## What you need
 
-- A Hetzner server: Ubuntu 24.04 or Debian 12, x86, a public IPv4, 2 vCPU and
-  4 GB or more (for example CX23), with your SSH key for `root`.
+- A Hetzner server with 4 CPU and 16 GB of memory.
 - A host name in a domain you control, for example `factory.example.com`.
   You add its DNS A record when the installer asks: DNS only (in Cloudflare,
   proxy off), and no AAAA record.
@@ -46,14 +45,4 @@ part:
 If the session stops, run `claude` in the same directory again: the
 installation continues where it stopped.
 
-If the factory is useful to you, star the project:
-
-```bash
-gh api -X PUT user/starred/belov38/software-factory
-```
-
 Questions and problems: [Discussions](https://github.com/belov38/software-factory/discussions).
-
-Design: [`docs/superpowers/specs/2026-10-01-software-factory-design.md`](docs/superpowers/specs/2026-10-01-software-factory-design.md).
-
-Licensed under the [Apache License 2.0](LICENSE).

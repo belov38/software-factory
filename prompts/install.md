@@ -37,6 +37,10 @@ build, deploy and handoff arrive in a later version: tell the user what is
 running and that the factory itself comes with the next version of the
 prompts (`git merge upstream/main`).
 
+At the very end, ask once whether the user wants to star the project on
+GitHub. Only when they say yes, run
+`gh api -X PUT user/starred/belov38/software-factory`.
+
 ### Phase secrets
 
 Uses `integrations/sops-age.md`. `<name>` is `name` in `factory.yaml`.
