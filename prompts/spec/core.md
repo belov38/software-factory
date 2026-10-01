@@ -49,7 +49,7 @@ with fakes of them.
    |---|---|
    | issue opened with a mention | `issue:<repo>#<number>:opened` |
    | label `factory` added | `issue:<repo>#<number>:labeled:factory` |
-   | comment created or edited | `comment:<id>:<updated_at>` |
+   | comment created (edits are ignored) | `comment:<id>` |
    | review submitted | `review:<id>` |
    | check run completed | `check:<id>:<conclusion>` |
    | pull request merged | `pr:<repo>#<number>:merged` |
