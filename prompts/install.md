@@ -115,11 +115,82 @@ the script with `--check-only`.
 
 ### Phase server
 
-(Task 11)
+Uses `integrations/hetzner-ssh.md` and `integrations/k3s.md`. `<ssh>` is
+`runtime.server.ssh`, `<ip>` its address.
+
+1. Preflight over SSH: `ssh <ssh> 'command -v k3s; ss -ltnp | grep -E ":(80|443) " ; ufw status'`.
+   - k3s is present and `~/.config/software-factory/<name>.kubeconfig`
+     exists: an earlier run of this phase was interrupted after installing
+     it. Check that `ssh <ssh> 'k3s --version'` shows the card's version and
+     continue at step 5.
+   - k3s is present otherwise, something already listens on 80 or 443, or
+     ufw is active with rules other than the card's: stop and ask the user.
+     This phase installs on a fresh server only, and enabling the firewall
+     would cut off whatever the server already serves.
+2. Firewall: run the ufw commands from the k3s card over SSH.
+3. k3s: run the install command from the card with the pinned version; check
+   `ssh <ssh> 'k3s --version'`.
+4. Kubeconfig, without printing it:
+   `ssh <ssh> 'cat /etc/rancher/k3s/k3s.yaml' > ~/.config/software-factory/<name>.kubeconfig && chmod 600 ~/.config/software-factory/<name>.kubeconfig`,
+   then `KUBECONFIG=~/.config/software-factory/<name>.kubeconfig kubectl config set-cluster default --server=https://127.0.0.1:16443`.
+5. Write `.factory/bin/tunnel.sh`, with `<ssh>` replaced by the value from `factory.yaml`:
+
+   ```bash
+   #!/usr/bin/env bash
+   # Opens the SSH tunnel to the Kubernetes API unless it is already open.
+   set -euo pipefail
+   # Written by the server phase from runtime.server.ssh in factory.yaml.
+   ssh_target='<ssh>'
+   if ! nc -z 127.0.0.1 16443 2>/dev/null; then
+     ssh -fN -o ExitOnForwardFailure=yes -L 16443:127.0.0.1:6443 "$ssh_target"
+   fi
+   ```
+
+   `chmod +x .factory/bin/tunnel.sh`, run it, and check
+   `KUBECONFIG=~/.config/software-factory/<name>.kubeconfig kubectl get nodes`
+   shows the node Ready.
+6. Check that the API is closed from outside: `nc -z -w5 <ip> 6443` fails.
+7. Commit `.factory/bin/tunnel.sh`. Record `k3sVersion`.
 
 ### Phase gitops
 
-(Task 11)
+Uses `integrations/flux.md`, `integrations/sops-age.md` and
+`integrations/ingress.md`. Run `.factory/bin/tunnel.sh` first and
+`export KUBECONFIG=~/.config/software-factory/<name>.kubeconfig`.
+
+1. `flux check --pre`.
+2. Bootstrap with the command from the Flux card (`--personal=true` when
+   `phases.home.ownerType` is `User`), then `git pull --rebase origin main`.
+3. Give Flux the age key (a bootstrap step, so direct kubectl is allowed):
+   `kubectl -n flux-system create secret generic sops-age --from-file=age.agekey=$HOME/.config/software-factory/<name>.agekey`.
+   When it already exists, leave it.
+4. Write `infra/base/`: `namespaces.yaml` (Namespaces `factory` and
+   `cert-manager`) and `cert-manager.yaml`: a HelmRepository `jetstack`
+   (`source.toolkit.fluxcd.io/v1`, namespace `cert-manager`, url
+   `https://charts.jetstack.io`, interval `1h`) and a HelmRelease
+   `cert-manager` (`helm.toolkit.fluxcd.io/v2`, namespace `cert-manager`,
+   chart `cert-manager` at the version from the ingress card, from that
+   HelmRepository, values `crds: { enabled: true }`, interval `1h`).
+5. Write `infra/config/cluster-issuer.yaml` with the ClusterIssuer from the
+   ingress card, `email` from `runtime.ingress.email`.
+6. Write `deploy/healthz/` with the placeholder Deployment, Service and
+   Ingress from the ingress card, in namespace `factory`, host
+   `runtime.ingress.host`. The factory's controller replaces it later.
+7. Write the Flux Kustomizations in `clusters/<name>/`. Each one is
+   `kustomize.toolkit.fluxcd.io/v1` in namespace `flux-system`, with
+   `sourceRef: { kind: GitRepository, name: flux-system }`, `interval: 10m`
+   and `prune: true`:
+   - `infra.yaml`: Kustomization `infra` (path `./infra/base`, `wait: true`)
+     and Kustomization `infra-config` (path `./infra/config`,
+     `dependsOn: [infra]`, `wait: true`);
+   - `secrets.yaml`: Kustomization `secrets` (path `./secrets`,
+     `dependsOn: [infra]`, `decryption: { provider: sops, secretRef: { name: sops-age } }`);
+   - `apps.yaml`: Kustomization `apps` (path `./deploy`,
+     `dependsOn: [infra-config, secrets]`, `wait: true`).
+8. Commit and push, then `flux reconcile source git flux-system` and wait up
+   to 10 minutes until `flux get kustomizations -A` shows every row Ready.
+9. Wait until `kubectl -n factory get certificate` shows `healthz-tls` Ready.
+10. Record `fluxVersion` (`flux --version`).
 
 ### Phase verify
 
