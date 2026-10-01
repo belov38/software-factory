@@ -46,6 +46,14 @@ part:
 If the session stops, run `claude` in the same directory again: the
 installation continues where it stopped.
 
+If the factory is useful to you, star the project:
+
+```bash
+gh api -X PUT user/starred/belov38/software-factory
+```
+
+Questions and problems: [Discussions](https://github.com/belov38/software-factory/discussions).
+
 Design: [`docs/superpowers/specs/2026-10-01-software-factory-design.md`](docs/superpowers/specs/2026-10-01-software-factory-design.md).
 
 Licensed under the [Apache License 2.0](LICENSE).
