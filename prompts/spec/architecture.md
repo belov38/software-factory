@@ -17,9 +17,10 @@ The build phase in `prompts/install.md` generates everything described here.
    `packages/adapters/*`; `apps/factory/.gitignore` ignores `node_modules`,
    `dist` and `*.tsbuildinfo`. Every package has the scripts `build` and
    `typecheck` (both `tsc -b`, which writes the ignored `dist`: `--noEmit`
-   cannot be combined with project references), `test` (`vitest run`, unit
-   tests only) and `test:contract` (contract tests, see 22). `pnpm -r` runs
-   the packages' scripts, not the root's.
+   cannot be combined with project references), `test` (`vitest run
+   --passWithNoTests`, unit tests only) and `test:contract` (contract tests,
+   see 22, also with `--passWithNoTests`). `pnpm -r` runs the packages'
+   scripts, not the root's.
 2. The packages:
 
    | Package | Path | Responsibility |
@@ -60,14 +61,15 @@ The build phase in `prompts/install.md` generates everything described here.
    one implementation each. It builds the adapters once per project; each
    adapter knows its project and its repository from its binding (`repo`).
    The controller routes a webhook to the project whose repository is the
-   payload's `repository.full_name`. The schema already limits the kinds; a
-   kind the registry does not know still stops the controller at start with
-   a message that names it.
+   payload's `repository.full_name`. A kind the registry does not know stops
+   the controller at start with a message that names it.
 
 ### Configuration
 
 7. The controller reads `factory.yaml` from `/etc/factory/factory.yaml` (the
-   ConfigMap `factory-config`) and validates it at start.
+   ConfigMap `factory-config`) and validates it at start. It checks the file
+   every 30 seconds and exits when it changed, so Kubernetes restarts it
+   with the new configuration.
 8. Environment of the controller: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`,
    `GITHUB_WEBHOOK_SECRET` (from the Secret `github-app`), `FACTORY_NAMESPACE`
    (`factory`), `FACTORY_IMAGE` and `FACTORY_AGENT_IMAGE` (full references with
@@ -111,8 +113,10 @@ The build phase in `prompts/install.md` generates everything described here.
     - `ghcr.io/<owner>/<repo>/agent:<sha7>` (`Dockerfile.agent`): `FROM` the
       factory image (build argument `FACTORY_IMAGE`), adds `curl`, `jq`,
       `ripgrep`, `python3` and `build-essential` from apt and Claude Code with
-      `npm install -g @anthropic-ai/claude-code` at its current release; user
-      `node`, `HOME=/home/node`.
+      `npm install -g @anthropic-ai/claude-code` at its current release;
+      `HOME=/home/node`.
+    Both Dockerfiles end with `USER 1000` (the `node` user), numeric, so that
+    `runAsNonRoot` can verify it.
 
 ### Deployment
 
@@ -123,19 +127,25 @@ The build phase in `prompts/install.md` generates everything described here.
       selects them): 1 replica, strategy `Recreate` (the
       ledger is SQLite on a ReadWriteOnce volume), service account
       `factory-controller`, the PVC `factory-ledger` at `/var/lib/factory`,
-      the ConfigMap `factory-config` at `/etc/factory`, environment from 8,
-      liveness and readiness on `/healthz`, `imagePullSecrets: [ghcr-pull]`,
-      `runAsNonRoot`.
+      the PVC `factory-sessions` at `/var/lib/factory-sessions` (the
+      controller does not use it yet, but mounting it binds it: `local-path`
+      binds a volume only for its first pod, and Helm waits for every PVC to
+      be bound), the ConfigMap `factory-config` at `/etc/factory`, environment
+      from 8, liveness and readiness on `/healthz`,
+      `imagePullSecrets: [ghcr-pull]`, `runAsNonRoot`, `runAsUser: 1000`,
+      `runAsGroup: 1000`, `fsGroup: 1000`.
     - Service `factory-controller` on 8080.
     - Ingress `factory`: class `traefik`, host `runtime.ingress.host`, TLS
       secret `factory-tls`, annotation
       `cert-manager.io/cluster-issuer: letsencrypt`, the three paths of 11.
     - PVCs `factory-ledger` (1 Gi) and `factory-sessions` (10 Gi), storage
-      class `local-path`. The cluster has one node, so turn pods can share
-      `factory-sessions`.
+      class `local-path`, with the annotation
+      `helm.sh/resource-policy: keep`, so an uninstall never deletes the
+      ledger and the transcripts. The cluster has one node, so turn pods can
+      share `factory-sessions`.
     - ServiceAccount `factory-controller` and a Role in `factory` that allows
-      Jobs (create, get, list, watch, delete), Secrets (create, get, delete),
-      Pods and `pods/log` (get, list, watch), bound to it.
+      Jobs (create, get, list, watch, delete), Secrets (create, get, patch,
+      delete), Pods and `pods/log` (get, list, watch), bound to it.
     - NetworkPolicy `factory-turns` (`prompts/spec/ports/runner.md`).
     - Values: `image.repository`, `image.tag`, `agentImage.repository`
       (same tag), `host`.
@@ -157,14 +167,16 @@ The build phase in `prompts/install.md` generates everything described here.
 ### Workflow
 
 18. `.github/workflows/factory-images.yml` runs on pushes to `main` that touch
-    `apps/factory/**`, with `permissions: { contents: write, packages: write }`
-    and a concurrency group, so two runs never race. It logs in to ghcr with
+    `apps/factory/**` or the workflow file itself, and on `workflow_dispatch`,
+    with `permissions: { contents: write, packages: write }` and a
+    concurrency group, so two runs never race. It logs in to ghcr with
     `GITHUB_TOKEN`, builds and pushes the factory image, then the agent image
     with `FACTORY_IMAGE` pointing at the factory image just pushed, both
     tagged with the first 7 characters of the commit SHA. Then, when
     `deploy/releases/factory.yaml` exists (the deploy phase writes it), it
     sets `image.tag` there, commits `Deploy factory images <sha7>` and
-    pushes. A commit made with
+    pushes; when `main` moved in the meantime, it rebases and pushes again,
+    up to three times. A commit made with
     `GITHUB_TOKEN` starts no workflow, so there is no loop. Actions are used
     at their current major versions.
 
@@ -198,5 +210,6 @@ The build phase in `prompts/install.md` generates everything described here.
   right one; `/internal/credentials` answers `403` for a wrong nonce.
 - In build step 6, once the chart exists: `helm template deploy/charts/factory`
   renders; no Ingress path starts with `/internal`; the controller's
-  strategy is `Recreate`; the NetworkPolicy `factory-turns` matches
-  `prompts/spec/ports/runner.md`.
+  strategy is `Recreate`; every PVC in the chart is mounted by the
+  controller; the controller runs as user 1000; the NetworkPolicy
+  `factory-turns` matches `prompts/spec/ports/runner.md`.

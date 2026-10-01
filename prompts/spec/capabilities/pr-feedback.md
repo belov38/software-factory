@@ -12,9 +12,10 @@ pull request, and the merge ends the session.
    work turn on the same session and branch; its commit lands on the same
    pull request (FEEDBACK-1). Human feedback has no limit.
 2. A failing check on the pull request's head commit starts a work turn
-   with the check's name, its link and the excerpt of its log. At most two
-   such turns run in a row; after the second, the factory tells the human
-   that CI still fails and waits. A human comment or review resets the
+   with the check's name, its link and the excerpt of its log; more failing
+   checks on the same commit join that turn. At most two such rounds, on
+   two successive head commits, run in a row; after the second, the factory
+   tells the human that CI still fails and waits. A human comment or review resets the
    count (FEEDBACK-2).
 3. Merging the pull request closes the issue (through `Closes #<n>`), the
    work item and the session; closing it without a merge closes the session
@@ -35,7 +36,8 @@ Core unit tests with fakes of the ports:
 
 - A human review on a ready pull request queues a work turn on the same
   session whose input starts with the review line (FEEDBACK-1).
-- Three failed checks on the head commit queue two fix turns and one
-  message to the human; a later human comment allows two more (FEEDBACK-2).
+- Failing checks on three successive head commits queue two fix turns and
+  one message to the human; two failing checks on one commit queue one turn;
+  a later human comment allows two more (FEEDBACK-2).
 - `change.merged` closes the session and the work item; `change.closed`
   closes the session (FEEDBACK-3).

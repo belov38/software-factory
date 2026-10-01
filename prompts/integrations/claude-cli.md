@@ -64,6 +64,9 @@ Tested with: Claude Code 2.1.286 on macOS (2026-10-01), pending the end-to-end r
   on stdin.
 - `--resume` finds a session only from the same working directory; every
   turn of a session runs in the same path.
+- `--session-id <id>` fails with "Session ID … is already in use" when a
+  transcript with that id exists, for example after a first turn that was
+  stopped. Use `--resume` whenever the transcript exists.
 - `--dangerously-skip-permissions` refuses to run as root. The factory does
   not use it: the agent image runs as `node` with
   `--permission-mode acceptEdits` and an explicit tool list.

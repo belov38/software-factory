@@ -40,7 +40,8 @@ events.
    `prompts/spec/ports/runner.md`).
 5. `markReady` uses the GraphQL mutation `markPullRequestReadyForReview`; the
    REST API has no such call.
-6. `postReview` posts a review with `event: COMMENT`, never `APPROVE` or
+6. `postReview` posts a review on `commit_id` = the change's `headSha`, with
+   `event: COMMENT`, never `APPROVE` or
    `REQUEST_CHANGES`: the App opened the pull request and GitHub refuses those
    from its author. The body starts with `Verdict: <verdict>`, then the
    summary, then every finding that has no line in the diff. Findings with a

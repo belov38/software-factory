@@ -28,7 +28,7 @@ on the test repository `<owner>/factory-sandbox`, and write the result to
 3. Run the checks in this order: INSTALL-1, INSTALL-2, ISOLATION-5,
    ISOLATION-2, CORE-1, CORE-2, CORE-3, CORE-6, CORE-4, REVIEW-1, REVIEW-3,
    REVIEW-2, REVIEW-4, CORE-5, CORE-7, ISOLATION-1, ISOLATION-3,
-   ISOLATION-4, FEEDBACK-2, FEEDBACK-1, FEEDBACK-3, CORE-8, INSTALL-3. Each
+   ISOLATION-4, FEEDBACK-2, FEEDBACK-1, FEEDBACK-3, INSTALL-3, CORE-8. Each
    procedure is below. Record pass or fail and the evidence: the command's
    relevant output and the links to the issues and pull requests.
 4. A check of the agent's behaviour (CORE-4, CORE-5, REVIEW-2, REVIEW-4,
@@ -86,7 +86,8 @@ names Let's Encrypt.
 ### INSTALL-3
 
 `node .factory/bin/github-app.mjs --deliveries` lists the deliveries of the
-checks above with status codes 2xx only.
+checks above with status codes 2xx only. It runs before CORE-8, which sends
+deliveries to a wrong URL on purpose.
 
 ### CORE-1, CORE-2, CORE-3
 
@@ -94,15 +95,16 @@ checks above with status codes 2xx only.
 CORE-2: `gh api repos/<s>/issues/<n>/reactions` has `eyes` by
 `<slug>[bot]`, created at most 10 seconds after the issue. CORE-1: wait for a
 comment by `<slug>[bot]` other than the status comment that answers the
-question; `gh pr list -R <s> --state all --search "head:factory/<n>-"`
-is empty. CORE-3: the issue has exactly one status comment for the turn, and
+question; `gh pr list -R <s> --state all --json headRefName -q '.[].headRefName' | grep "^factory/<n>-"`
+prints nothing. CORE-3: the issue has exactly one status comment for the turn, and
 its `updated_at` is later than its `created_at`.
 
 ### CORE-6
 
 On the same issue, comment `@<slug> What was my first question here? Quote its first four words.`
-The answer quotes "What does src/sum.ts". The turn's Job ran with the same
-session: the status page of both turns shows the same session id.
+The answer quotes "What does src/sum.ts". A resumed turn's context holds only
+the new comment, so only the agent's own session can know the first question;
+the status pages of both turns also show the same session id.
 
 ### CORE-4, REVIEW-1, REVIEW-3
 
@@ -202,7 +204,8 @@ of the session's last turn shows the session closed.
 
 `node .factory/bin/github-app.mjs --webhook-url https://<host>/webhooks/none`,
 then `gh issue create -R <s> --title "verify: poll" --body "@<slug> What does src/sum.ts export?"`.
-Within 7 minutes the issue gets 👀 and an answer. Always restore the URL
+Within 10 minutes the issue gets 👀 and an answer (the poll runs every 5
+minutes, then the turn runs). Always restore the URL
 afterwards, also when the check fails:
 `node .factory/bin/github-app.mjs --webhook-url https://<host>/webhooks/github`.
 

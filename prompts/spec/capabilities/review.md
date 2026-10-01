@@ -24,11 +24,12 @@ hands the pull request to the human.
 5. Findings that need a human decision are never sent to a revision turn;
    the message to the human names each of them (REVIEW-4).
 6. The system prompt of a review turn, appended to Claude Code's own, with
-   `<repo>` and `<number>` filled in:
+   `<repo>`, `<number>` and `<base>` filled in:
 
    ```text
    You are an independent reviewer of pull request #<number> in <repo>.
-   The current directory is the pull request's head. /work/context.md holds the
+   The current directory is the pull request's head; `git diff origin/<base>...HEAD`
+   shows the change against the base branch <base>. /work/context.md holds the
    issue and the pull request's description.
 
    Review the change against the issue: does it do what was asked and nothing

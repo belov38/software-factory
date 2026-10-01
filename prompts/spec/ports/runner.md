@@ -36,7 +36,8 @@ publisher's guards.
      `{ spec: TurnSpec, project: <the project's entry of factory.yaml>, appSlug, botEmail, statusUrl }`.
    - `POST /internal/turns/:id/progress` takes `{ plan, current, phase }`;
      the status page shows the latest one.
-   - `POST /internal/turns/:id/result` takes the report of 11 or 13.
+   - `POST /internal/turns/:id/result` takes the report of 11 or 13; the
+     same report sent again answers `200` (`prompts/spec/core.md`).
    - `POST /internal/credentials` takes `{ turnId, purpose }` and returns a
      token (`prompts/spec/ports/credentials.md`).
    A container that cannot reach the controller retries for 10 minutes
@@ -50,10 +51,12 @@ publisher's guards.
    `activeDeadlineSeconds` from `limits.turnDeadlineSeconds`,
    `ttlSecondsAfterFinished: 86400`, and the labels
    `app.kubernetes.io/component: turn` and `factory/turn-id: <id>` on the Job
-   and on its pod template. Then it creates a Secret
-   `turn-<first 8 characters>` with the key `nonce`, owned by the Job
-   (`blockOwnerDeletion: false`), so it goes with the Job; the pod waits for
-   it. `cancel` deletes the Job with foreground propagation.
+   and on its pod template. It creates the Secret
+   `turn-<first 8 characters>` with the key `nonce` first, then the Job, then
+   patches the Secret's owner to the Job (`blockOwnerDeletion: false`), so
+   the Secret goes with the Job and a pod never waits for a Secret that a
+   crash kept from being created. `cancel` deletes the Job with foreground
+   propagation.
 4. The pod: `automountServiceAccountToken: false` (ISOLATION-1), user and
    group 1000, `imagePullSecrets: [ghcr-pull]`, and these volumes:
    - `work` (emptyDir): `/work/tree` (the agent's working tree),
@@ -74,7 +77,9 @@ publisher's guards.
    `agent`. The main container is `publisher` for work turns and `reporter`
    for review turns. Only `agent` uses the agent image.
 6. `checkout` reads the envelope, writes it to `/work/turn.json` (it holds no
-   secret) for `agent`, takes a `clone` (work) or `review-read` (review)
+   secret) for `agent` only (every other container reads the envelope from
+   the controller, because the agent can write to `/work`), takes a `clone`
+   (work) or `review-read` (review)
    token and clones into `/work/tree` and, for work turns, `/work/clean`.
    The token goes in an HTTP header through `GIT_CONFIG_COUNT`,
    `GIT_CONFIG_KEY_0=http.https://github.com/.extraheader` and
@@ -82,11 +87,14 @@ publisher's guards.
    never in a URL or in `.git/config`. A work turn checks out the session
    branch when it exists on the remote, otherwise creates it from the
    default branch; a review turn fetches the change's `headSha`, falling
-   back to its branch.
+   back to its branch, and the default branch, so that
+   `git diff origin/<default branch>...HEAD` shows the change.
 7. `context` takes a `channel` token, reads the work item through the
    tracker, and writes `/work/context.md`: the item, the conversation, and
-   the turn's input under the heading "New since your last turn". For a
-   review turn the input holds the pull request's description.
+   the turn's input under the heading "New since your last turn". A turn
+   that resumes its session gets only the new input and the item's link
+   (the agent remembers the rest, CORE-6). For a review turn the input holds
+   the pull request's description.
 8. `streamer` takes a `channel` token, follows `/work/out/events.jsonl`, and
    at most every 10 seconds calls `channel.progress` (keeping the comment id
    it returns, so the turn has one status comment, CORE-3) and
@@ -98,21 +106,32 @@ publisher's guards.
    `prompts/spec/capabilities/` and the content of `/work/context.md` as the
    prompt, writes each harness event to `/work/out/events.jsonl` and the
    final event to `/work/out/final.json`, and exits 0 even when the agent
-   failed, so the result is still reported. Its environment: the Secret
-   `factory-model`, `FACTORY_TURN_CANARY` (a random value the runner sets
-   per turn) and `CLAUDE_CONFIG_DIR=/home/node/.claude-session`.
-10. `publisher` (work): when `final.json` is an error, it publishes nothing.
-    Otherwise, when the agent's tree differs from the branch, it copies
-    `/work/tree` over `/work/clean` without the top-level `.git` (a nested
-    `.git` is copied, so an embedded repository shows as a gitlink and the
-    guard refuses it), stages everything, applies the guards (12), commits
-    as `<app-slug>[bot] <botEmail>` with the final message's first line as
-    the subject, takes a `publish` token and pushes the session branch
-    without force. On the first change it opens the draft through the forge
-    with the final message followed by `Closes #<issue number>` as the body;
-    later turns push to the same branch and leave the body alone.
+   failed, so the result is still reported. The harness options: `model`
+   from `runtime.harness.models.work` or `.review`, `maxTurns` from
+   `limits.maxAgentTurns`, `subagents` true for work turns and false for
+   review turns. Its environment: the Secret `factory-model`,
+   `FACTORY_TURN_CANARY` (a random value the runner sets per turn) and
+   `CLAUDE_CONFIG_DIR=/home/node/.claude-session`; Claude Code inherits it.
+10. `publisher` (work) reads the envelope from the controller. When
+    `final.json` is an error, it publishes nothing. Otherwise, when the
+    agent's tree differs from the branch, it makes `/work/clean` an exact
+    mirror of `/work/tree` without the top-level `.git`: deleted files are
+    deleted, symbolic links are copied as links and never followed, and a
+    nested `.git` is copied, so an embedded repository shows as a gitlink
+    and the guard refuses it. It stages everything, applies the guards (12),
+    commits as `<app-slug>[bot] <botEmail>` with the final message's first
+    line as the subject, takes a `publish` token and pushes the session
+    branch without force. When no pull request exists for the branch yet
+    and the final message is not a question (the rule of
+    `prompts/spec/core.md` 16), it opens the draft through the forge, titled
+    with the final message's first line, with the final message followed by
+    `Closes #<issue number>` as the body. A final message that is a question
+    pushes the branch but opens no draft. Later turns push to the same
+    branch and leave the body alone.
 11. The publisher's report: `{ finalText, isError, usage, change?: { branch,
-    number, url, headSha }, refused?: string }`.
+    number, url, headSha }, refused?: string }`. It also writes the report to
+    `/dev/termination-log`, with `finalText` cut so the message stays under
+    Kubernetes' 4096 bytes, so a result whose delivery failed is not lost.
 12. Guards. The publisher refuses, and reports why, when:
     - the branch is not under `factory/` (ISOLATION-3);
     - a path under `.github/workflows/` is added, changed or removed;
@@ -120,7 +139,8 @@ publisher's guards.
     - more than 1000 files change or more than 50 MiB of file content is
       added or changed;
     - the push is not a fast-forward.
-13. `reporter` (review) reports `{ finalText, usage }`.
+13. `reporter` (review) reports `{ finalText, usage }`, and writes it to
+    `/dev/termination-log` the same way.
 
 ### Isolation
 
@@ -147,7 +167,10 @@ publisher's guards.
     `events.jsonl` (the streamer posts from that file while the agent runs
     and holds none of the agent's secrets), redacts `final.json`, and after
     the harness finishes redacts the files of `/work/tree` and the session's
-    transcript files under `/home/node/.claude-session`.
+    transcript files under `/home/node/.claude-session`. It also redacts
+    those transcript files when it starts, because a turn that was stopped
+    or killed never reached the end. A transcript can still hold the model
+    key it was redacted from only if the key changed between turns.
 
 ## Tests
 
@@ -162,7 +185,13 @@ publisher's guards.
   MiB of new content and a non-fast-forward push (ISOLATION-3); it publishes
   nothing after an error.
 - Unit: the first published change opens a draft whose body ends with
-  `Closes #<n>`; a later change leaves the body alone.
+  `Closes #<n>`; a later change leaves the body alone; a final message that
+  is a question pushes the branch and opens no draft.
+- Unit: the mirror deletes files the agent deleted and copies a symbolic
+  link as a link.
+- Unit: the Secret is created before the Job and owned by it afterwards.
+- Unit: the publisher's report is also written, cut to 4096 bytes, as the
+  termination message.
 - Unit: after `checkout`, `/work/tree/.git/config` contains no token.
 - Unit: a canary and a `_TOKEN` value printed by the agent appear as
   `[redacted]` in each line of `events.jsonl` as it is written, in

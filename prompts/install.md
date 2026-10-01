@@ -267,7 +267,8 @@ cards under `integrations/`. `<owner>` is the owner of `home.repo`.
    `node .factory/bin/github-app.mjs --check-only` lists it.
 3. Add the sandbox to `projects` in `factory.yaml` (name `factory-sandbox`,
    the same kinds as the other projects), check the file against its schema
-   and commit.
+   and commit. Create the label `factory` in every project repository:
+   `gh label create factory -R <repo> --description "Work for the factory" --force`.
 4. Generate `apps/factory` as `prompts/spec/architecture.md` describes, one
    component per commit, in this order: contracts, core, each adapter,
    registry, turn, controller. Each component comes with the tests that its spec file lists
@@ -278,8 +279,8 @@ cards under `integrations/`. `<owner>` is the owner of `home.repo`.
    read the App's credentials inside the test process with
    `sops --decrypt secrets/github-app.sops.yaml` and
    `SOPS_AGE_KEY_FILE=~/.config/software-factory/<name>.agekey`, never from a
-   plaintext file or the command line, and remove the issues, branches and
-   pull requests they create.
+   plaintext file or the command line, and close the issues and pull
+   requests and delete the branches they create.
 6. Generate the Dockerfiles, the chart `deploy/charts/factory` and the
    workflow `.github/workflows/factory-images.yml` (architecture 12 to 18),
    one commit each. Check the chart with `helm template deploy/charts/factory`.

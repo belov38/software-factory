@@ -32,10 +32,16 @@ later turns and reports usage. v1 has one harness, Claude Code.
    `claude -p --output-format stream-json --verbose --model <model>
    --permission-mode acceptEdits --allowedTools <tools> --max-turns <maxTurns>
    --append-system-prompt <systemPrompt>`, plus `--resume <sessionId>` when
-   `resume` is true, otherwise `--session-id <sessionId>`. The prompt goes to
+   the session's transcript exists
+   (`$CLAUDE_CONFIG_DIR/projects/*/<sessionId>.jsonl`), otherwise
+   `--session-id <sessionId>`: Claude Code refuses `--session-id` for an id
+   that already has a transcript, which a stopped or failed first turn
+   leaves behind. The `resume` option is only a hint. The prompt goes to
    stdin, never as an argument (a variadic flag before it would swallow it).
    The working directory is `cwd`, the same for every turn of a session, so
-   `--resume` finds the transcript (CORE-6). `CLAUDE_CONFIG_DIR` is in `env`.
+   `--resume` finds the transcript (CORE-6). `claude` inherits the
+   container's environment (the model key comes from it) plus `env`, which
+   holds `CLAUDE_CONFIG_DIR`.
 3. Tools, passed as one comma-separated argument of `--allowedTools`:
    `Read`, `Write`, `Edit`, `Glob`, `Grep`, `Bash`, `ToolSearch`,
    `TaskCreate`, `TaskUpdate`, `TaskList`, `TaskGet`, `TodoWrite`, and, when
@@ -57,10 +63,9 @@ later turns and reports usage. v1 has one harness, Claude Code.
    - other events are ignored.
 5. When `claude` exits without a `result` event, `run` ends with a `final`
    whose `isError` is true and whose text is the last 50 lines of stderr.
-6. The core sets `resume` from the session's `harness_started` and sets that
-   flag after the first turn whose `final` is not an error: a first turn that
-   failed before Claude Code created the session must not make the next one
-   resume a session that does not exist.
+6. The core passes `resume` from the session's `harness_started`, set after
+   the first turn whose `final` is not an error; the adapter decides by the
+   transcript (2).
 
 ## Tests
 
@@ -69,6 +74,7 @@ later turns and reports usage. v1 has one harness, Claude Code.
   done, two actions for `Write` (the second with its result), a thought
   `DONE`, and a final with the usage of its `result`.
 - Unit: the first turn of a session passes `--session-id`, later turns pass
-  `--resume` with the same id and the same working directory (CORE-6).
+  `--resume` with the same id and the same working directory (CORE-6); a
+  transcript without `harness_started` (a stopped first turn) resumes.
 - Unit: the prompt is written to stdin and never appears in the arguments.
 - Unit: an exit without `result` yields one `final` with `isError: true`.
