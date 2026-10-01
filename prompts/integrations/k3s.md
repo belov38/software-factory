@@ -39,13 +39,20 @@ Tested with: k3s v1.36.4+k3s1 (stable channel on 2026-10-01), pending the end-to
 - Never open 6443 to the internet.
 - A local port 6443 may already be used by another cluster or tool on the
   user's machine, so the tunnel binds local port 16443.
+- The coding agent runs each command in a fresh shell: `export KUBECONFIG`
+  does not carry over to the next command, and a bare `kubectl` or `flux`
+  then acts on the user's own current cluster. Every command goes through
+  `.factory/bin/kube`, which sets the kubeconfig per command.
+- ufw's default policy drops forwarded traffic; whether k3s's own rules let
+  the traffic to Traefik through is checked by the port 80 smoke test, not
+  assumed.
 
 ## Smoke test
 
-Through the tunnel (`.factory/bin/tunnel.sh`), and from the user's machine:
+From the user's machine, in the factory repository:
 
 ```bash
-KUBECONFIG=<kubeconfig> kubectl get nodes                    # the node is Ready
+.factory/bin/kube kubectl get nodes -o wide                   # one node, Ready, named after the server
 nc -z -w5 <ip> 6443 && echo open || echo closed               # closed
 curl -s -o /dev/null -w '%{http_code}\n' --max-time 10 http://<ip>/   # 404 from Traefik: port 80 passes ufw
 ```

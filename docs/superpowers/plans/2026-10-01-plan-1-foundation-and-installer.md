@@ -1877,7 +1877,7 @@ The user starts a new session in the same directory. Expected: the agent reads `
 
 - [ ] **Step 6: Re-run on an installed server**
 
-After a passing run, ask the user to start a session and ask for the server phase again after removing `phases.server` from `.factory/state.json` in a scratch branch. Expected: the preflight finds k3s and stops to ask instead of reinstalling. Discard the scratch branch.
+After a passing run, ask the user to start a session and ask for the server phase again after removing `phases.server` from `.factory/state.json` in a scratch branch. Expected: the preflight recognises the cluster this installation made (`.factory/bin/kube kubectl get nodes -o name` prints the server's node) and continues without reinstalling. Then move the kubeconfig away and repeat: the preflight finds k3s and stops to ask. Restore the kubeconfig and discard the scratch branch.
 
 - [ ] **Step 7: Check for the canary**
 
@@ -1885,11 +1885,11 @@ Search the transcript for the canary: `grep -rl '<canary>' ~/.claude/projects/<t
 
 - [ ] **Step 8: Organisation owner (when available)**
 
-When the user administers a GitHub organisation, repeat only the github-app phase for a second test factory owned by it. Expected: the helper opens the organisation creation URL and the App is created there.
+When the user administers a GitHub organisation, repeat only the github-app phase for a second test factory owned by it, with a project repository owned by the same organisation (a private App installs only on its owner). Expected: the helper opens the organisation creation URL and the App is created there.
 
 - [ ] **Step 9: Fix and repeat**
 
-For every problem seen (a wrong command, a missing check, the agent guessing), fix the prompt or card in `~/prj-other/software-factory`, run `pnpm --dir tools/check check`, commit and push, and the user repeats the run from a fresh clone and a rebuilt server until one run passes without intervention beyond the human steps. Then record check 5 from the passing run: `ssh <ssh> 'free -m'` and, through the tunnel, `kubectl top pods -A`; write the recommended server size (the memory in use plus 4 GiB for one turn, rounded up to a Hetzner server type) into the spec's Check results and `hetzner-ssh.md`, and replace every card's `Tested with:` line with the versions and date of that run. Set the date of the `0.1.0-alpha.1` entry in `CHANGELOG.md` and commit.
+For every problem seen (a wrong command, a missing check, the agent guessing), fix the prompt or card in `~/prj-other/software-factory`, run `pnpm --dir tools/check check`, commit and push, and the user repeats the run from a fresh clone and a rebuilt server, with a new host and a new factory name for each run (Let's Encrypt issues at most 5 certificates for the same host per week, and a reused name finds the previous run's key, env file, repository and App), until one run passes without intervention beyond the human steps. Then record check 5 from the passing run: `ssh <ssh> 'free -m'` and, through the tunnel, `kubectl top pods -A`; write the recommended server size (the memory in use plus 4 GiB for one turn, rounded up to a Hetzner server type) into the spec's Check results and `hetzner-ssh.md`, and replace every card's `Tested with:` line with the versions and date of that run. Set the date of the `0.1.0-alpha.1` entry in `CHANGELOG.md` and commit.
 
 - [ ] **Step 10: Clean up the test resources**
 

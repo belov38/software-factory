@@ -12,7 +12,9 @@ Tested with: Ubuntu 24.04, pending the end-to-end run (2026-10-01).
   is updated when they are measured.
 - Login is `root` with the SSH key chosen when the server was created. The
   installer needs key login without a password prompt:
-  `ssh -o BatchMode=yes <user>@<ip>` must succeed.
+  `ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new <user>@<ip> true`
+  must succeed. `accept-new` records the host key of a server this machine
+  has not seen yet; `BatchMode` alone refuses it.
 - A Cloud server has a public IPv4 unless it was created IPv6-only.
 - Hetzner Cloud has a metadata service at
   `http://169.254.169.254/hetzner/v1/metadata` (hostname, public keys, user
@@ -40,7 +42,7 @@ Tested with: Ubuntu 24.04, pending the end-to-end run (2026-10-01).
 ## Smoke test
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 <user>@<ip> 'cat /etc/os-release; uname -m; nproc; free -m; df -h /'
+ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 <user>@<ip> 'cat /etc/os-release; hostname; uname -m; nproc; free -m; df -h /'
 ```
 
 Expected: `ID=ubuntu` with `VERSION_ID="24.04"` (or `ID=debian` with

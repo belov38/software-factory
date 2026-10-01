@@ -4,11 +4,14 @@ Tested with: Flux v2.9.5 (CLI on macOS, 2026-10-01), pending the end-to-end run.
 
 ## Facts
 
-- `flux check --pre` checks that the cluster in `KUBECONFIG` can run Flux.
-- Bootstrap with the user's GitHub login, from the repository root:
+- `flux` acts on the cluster in `KUBECONFIG`; in an installation every
+  command runs through `.factory/bin/kube` (see `k3s.md`).
+- `.factory/bin/kube flux check --pre` checks that the cluster can run Flux.
+- Bootstrap with the user's GitHub login, from the repository root; the
+  token goes to `flux` through the environment, never on the command line:
 
   ```bash
-  GITHUB_TOKEN=$(gh auth token) flux bootstrap github \
+  GITHUB_TOKEN=$(gh auth token) .factory/bin/kube flux bootstrap github \
     --owner=<owner> --repository=<repo> --branch=main \
     --path=clusters/<name> --private=true --personal=<true|false>
   ```
@@ -27,9 +30,9 @@ Tested with: Flux v2.9.5 (CLI on macOS, 2026-10-01), pending the end-to-end run.
 - Status and a manual sync:
 
   ```bash
-  flux get kustomizations -A
-  flux get helmreleases -A
-  flux reconcile source git flux-system
+  .factory/bin/kube flux get kustomizations -A
+  .factory/bin/kube flux get helmreleases -A
+  .factory/bin/kube flux reconcile source git flux-system
   ```
 
 ## Pitfalls
@@ -45,6 +48,6 @@ Tested with: Flux v2.9.5 (CLI on macOS, 2026-10-01), pending the end-to-end run.
 ## Smoke test
 
 ```bash
-flux check
-flux get kustomizations -A     # flux-system shows Ready True
+.factory/bin/kube flux check
+.factory/bin/kube flux get kustomizations -A     # flux-system shows Ready True
 ```

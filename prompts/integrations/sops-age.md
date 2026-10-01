@@ -44,6 +44,10 @@ Tested with: sops 3.13.3 and age 1.3.2 on macOS, with the smoke test below (2026
 - Never write plaintext into the repository, not even temporarily: a commit or
   an editor's backup file can keep it.
 - `sops --decrypt` without `> /dev/null` prints the secret.
+- The first half of the encryption pipe on its own
+  (`kubectl create secret ... --dry-run=client -o yaml`) prints the secret,
+  base64-encoded, which anyone can decode. Never run it without the pipe into
+  sops, not even to debug.
 
 ## Smoke test
 

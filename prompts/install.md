@@ -82,6 +82,10 @@ the script with `--check-only`.
 
 1. Write `.factory/bin/github-app.mjs`, a Node script without dependencies
    that:
+   - runs from the repository root and, before it serves anything, checks
+     that it can encrypt: it pipes a dummy Secret through the sops command
+     below into `/dev/null`, and exits 1 when that fails, so a sops problem
+     shows before the user creates the App;
    - listens on `127.0.0.1:8765`;
    - serves `/` as an HTML page that posts the manifest to the creation URL
      for the owner type in `phases.home.ownerType` (user or organisation
@@ -91,23 +95,34 @@ the script with `--check-only`.
      `{ url: "https://<runtime.ingress.host>/webhooks/github", active: true }`,
      `redirect_url` `http://127.0.0.1:8765/callback`, `public: false`, and the
      permissions and events from the card;
-   - on `/callback` checks `state`, converts the code, redirects the browser
-     to `https://github.com/apps/<slug>/installations/new`;
-   - pipes a Secret manifest `github-app` (namespace `factory`, `stringData`:
-     `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`,
-     `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`) into
+   - on `/callback` checks `state` and converts the code, then, before
+     anything else, pipes a Secret manifest `github-app` (namespace
+     `factory`, `stringData`: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`,
+     `GITHUB_WEBHOOK_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`,
+     every value a string, the App id too) into
      `sops --encrypt --filename-override secrets/github-app.sops.yaml --input-type yaml --output-type yaml /dev/stdin`
      (the creation rule in `.sops.yaml` supplies the recipient; see the sops
-     card) and writes the result to `secrets/github-app.sops.yaml`; the
-     plaintext exists only in the script's memory;
+     card) and writes the result to `secrets/github-app.sops.yaml`. The
+     private key exists only in this response, so when the write fails the
+     script keeps running and retries every 10 seconds, printing the error,
+     until it succeeds. Only then it redirects the browser to
+     `https://github.com/apps/<slug>/installations/new`. The plaintext exists
+     only in the script's memory;
    - then polls `GET /app/installations` with an App JWT every 5 seconds,
      for at most 10 minutes, until one exists; lists its repositories with an
      installation token;
    - prints only `appId`, `slug`, the installation account and the
      repository names, and exits 0; exits 1 with a message on any error.
+     Messages name the step and the HTTP status, never a response body, the
+     key or a secret.
 2. Start it in the background and tell the user: open
-   `http://127.0.0.1:8765/`, check the name, click "Create GitHub App", then
-   on the next page choose the project repositories and click "Install".
+   `http://127.0.0.1:8765/` in a browser on this machine, check the name,
+   click "Create GitHub App", then on the next page choose the project
+   repositories and click "Install". When GitHub says the name is taken by an
+   App the user created in an earlier, interrupted run, ask them to delete
+   that App first (`https://github.com/settings/apps/<slug>/advanced`, or
+   `https://github.com/organizations/<org>/settings/apps/<slug>/advanced`)
+   instead of creating a second one.
 3. Wait for the script to exit. Every project repository in `factory.yaml`
    must be in its list; when one is missing, ask the user to add it at
    `https://github.com/apps/<slug>/installations/new` and run the check
@@ -121,53 +136,74 @@ the script with `--check-only`.
 ### Phase server
 
 Uses `integrations/hetzner-ssh.md` and `integrations/k3s.md`. `<ssh>` is
-`runtime.server.ssh`, `<ip>` its address.
+`runtime.server.ssh`, `<ip>` its address, `<node>` the output of
+`ssh <ssh> hostname` in lower case (k3s names the node after it).
 
-1. Preflight over SSH: `ssh <ssh> 'command -v k3s; ss -ltnp | grep -E ":(80|443) " ; ufw status'`.
+1. Preflight over SSH:
+   `ssh <ssh> 'command -v k3s docker; ss -ltnp; ufw status; systemctl is-active firewalld; nft list ruleset 2>/dev/null | grep -c "^table"'`.
    - k3s is present and `~/.config/software-factory/<name>.kubeconfig`
-     exists: an earlier run of this phase was interrupted after installing
-     it. Check that `ssh <ssh> 'k3s --version'` shows the card's version and
-     continue at step 5.
-   - k3s is present otherwise, something already listens on 80 or 443, or
-     ufw is active with rules other than the card's: stop and ask the user.
-     This phase installs on a fresh server only, and enabling the firewall
-     would cut off whatever the server already serves.
+     exists: an earlier run of this phase may have installed it. Write
+     `.factory/bin/kube` as in step 5 and run
+     `.factory/bin/kube kubectl get nodes -o name`. When it prints exactly
+     `node/<node>`, continue at step 6; otherwise treat the server as below.
+   - Stop and ask the user when k3s is present otherwise, Docker is
+     installed, a process other than sshd listens on an address other than
+     `127.0.0.x` or `::1`, ufw or firewalld is active, or nftables has
+     tables. This phase installs on a fresh server only, and enabling the
+     firewall would cut off whatever the server already serves.
 2. Firewall: run the ufw commands from the k3s card over SSH.
 3. k3s: run the install command from the card with the pinned version; check
    `ssh <ssh> 'k3s --version'`.
 4. Kubeconfig, without printing it:
    `ssh <ssh> 'cat /etc/rancher/k3s/k3s.yaml' > ~/.config/software-factory/<name>.kubeconfig && chmod 600 ~/.config/software-factory/<name>.kubeconfig`,
    then `KUBECONFIG=~/.config/software-factory/<name>.kubeconfig kubectl config set-cluster default --server=https://127.0.0.1:16443`.
-5. Write `.factory/bin/tunnel.sh`, with `<ssh>` replaced by the value from `factory.yaml`:
+5. Write `.factory/bin/kube`, with `<ssh>` and `<name>` replaced by the
+   values from `factory.yaml`, and `chmod +x` it:
 
    ```bash
    #!/usr/bin/env bash
-   # Opens the SSH tunnel to the Kubernetes API unless it is already open.
+   # Runs a command against this factory's cluster: opens the SSH tunnel to the
+   # Kubernetes API unless it is open, then runs the command with KUBECONFIG set.
+   # Usage: .factory/bin/kube kubectl get nodes
    set -euo pipefail
-   # Written by the server phase from runtime.server.ssh in factory.yaml.
+   # Written by the server phase from factory.yaml.
    ssh_target='<ssh>'
+   kubeconfig="$HOME/.config/software-factory/<name>.kubeconfig"
    if ! nc -z 127.0.0.1 16443 2>/dev/null; then
-     ssh -fN -o ExitOnForwardFailure=yes -L 16443:127.0.0.1:6443 "$ssh_target"
+     ssh -fN -o ExitOnForwardFailure=yes -L 16443:127.0.0.1:6443 "$ssh_target" </dev/null >/dev/null
    fi
+   exec env KUBECONFIG="$kubeconfig" "$@"
    ```
 
-   `chmod +x .factory/bin/tunnel.sh`, run it, and check
-   `KUBECONFIG=~/.config/software-factory/<name>.kubeconfig kubectl get nodes`
-   shows the node Ready.
+   Run every `kubectl` and `flux` command of this installation through it
+   (`.factory/bin/kube kubectl ...`, `.factory/bin/kube flux ...`). Each
+   command runs in a fresh shell, so an exported `KUBECONFIG` does not carry
+   over, and a bare `kubectl` acts on whatever cluster the user's own
+   configuration selects. Check that `.factory/bin/kube kubectl get nodes -o name`
+   prints exactly `node/<node>` and that the node is Ready.
 6. Check that the API is closed from outside: `nc -z -w5 <ip> 6443` fails.
-7. Commit `.factory/bin/tunnel.sh`. Record `k3sVersion`.
+7. Check that port 80 reaches Traefik from outside: within 2 minutes,
+   `curl -s -o /dev/null -w '%{http_code}' --max-time 10 http://<ip>/` prints
+   `404`. When it does not, a Hetzner Cloud Firewall or the Robot firewall
+   blocks port 80, or ufw blocks the traffic to Traefik: tell the user what
+   you see and stop. Let's Encrypt needs port 80 in the gitops phase.
+8. Commit `.factory/bin/kube`. Record `k3sVersion`.
 
 ### Phase gitops
 
 Uses `integrations/flux.md`, `integrations/sops-age.md` and
-`integrations/ingress.md`. Run `.factory/bin/tunnel.sh` first and
-`export KUBECONFIG=~/.config/software-factory/<name>.kubeconfig`.
+`integrations/ingress.md`. Run every `kubectl` and `flux` command through
+`.factory/bin/kube` (see the server phase).
 
-1. `flux check --pre`.
-2. Bootstrap with the command from the Flux card (`--personal=true` when
-   `phases.home.ownerType` is `User`), then `git pull --rebase origin main`.
+1. Check that `.factory/bin/kube kubectl get nodes -o name` prints exactly
+   `node/<node>` (the server's hostname in lower case); when it does not,
+   stop: the bootstrap would go to another cluster. Then
+   `.factory/bin/kube flux check --pre`.
+2. Bootstrap with the command from the Flux card, run through
+   `.factory/bin/kube` (`--personal=true` when `phases.home.ownerType` is
+   `User`), then `git pull --rebase origin main`.
 3. Give Flux the age key (a bootstrap step, so direct kubectl is allowed):
-   `kubectl -n flux-system create secret generic sops-age --from-file=age.agekey=$HOME/.config/software-factory/<name>.agekey`.
+   `.factory/bin/kube kubectl -n flux-system create secret generic sops-age --from-file=age.agekey=$HOME/.config/software-factory/<name>.agekey`.
    When it already exists, leave it.
 4. Write `infra/base/`: `namespaces.yaml` (Namespaces `factory` and
    `cert-manager`) and `cert-manager.yaml`: a HelmRepository `jetstack`
@@ -192,9 +228,11 @@ Uses `integrations/flux.md`, `integrations/sops-age.md` and
      `dependsOn: [infra]`, `decryption: { provider: sops, secretRef: { name: sops-age } }`);
    - `apps.yaml`: Kustomization `apps` (path `./deploy`,
      `dependsOn: [infra-config, secrets]`, `wait: true`).
-8. Commit and push, then `flux reconcile source git flux-system` and wait up
-   to 10 minutes until `flux get kustomizations -A` shows every row Ready.
-9. Wait until `kubectl -n factory get certificate` shows `healthz-tls` Ready.
+8. Commit and push, then `.factory/bin/kube flux reconcile source git flux-system`
+   and wait up to 10 minutes until `.factory/bin/kube flux get kustomizations -A`
+   shows every row Ready.
+9. Wait until `.factory/bin/kube kubectl -n factory get certificate` shows
+   `healthz-tls` Ready.
 10. Record `fluxVersion` (`flux --version`).
 
 ### Phase verify

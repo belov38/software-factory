@@ -24,12 +24,25 @@ Ask the user for the factory's settings and write them to `factory.yaml`.
    certificate use it. Ask for the host and for an email for the Let's
    Encrypt account (it is written to the repository; it is not a secret).
    Tell the user to create an A record from the host to the server's IPv4 at
-   their DNS provider, then check every 30 seconds, for up to 15 minutes,
-   until `dig +short <host>` prints exactly that address. When it prints
-   nothing or another address, say so and keep waiting; do not continue
-   before it matches.
+   their DNS provider. The record must be DNS only (in Cloudflare: proxy
+   status off; a proxied record resolves to the provider's addresses), and
+   the host must have no AAAA record: Let's Encrypt prefers IPv6, and the
+   factory serves IPv4 only.
+
+   Then check every 30 seconds with a public resolver until
+   `dig +short A <host> @1.1.1.1` prints exactly the server's IPv4 and
+   `dig +short AAAA <host> @1.1.1.1` prints nothing. An empty answer can stay
+   cached for minutes when the host was looked up before the record existed;
+   when the user says the record exists and the answer stays empty, ask the
+   domain's own nameserver (`dig +short NS <domain>`, then
+   `dig +short A <host> @<nameserver>`). After 15 minutes without a match,
+   tell the user what each query prints and ask whether to keep waiting or
+   to fix the record. Never continue before the addresses match.
 3. Projects. Ask which GitHub repositories the factory will serve (at least
-   one). For each, `gh repo view <owner>/<repo>` must succeed. Name each
+   one). For each, `gh repo view <owner>/<repo>` must succeed, and the owner
+   must be the owner of the factory repository (`phases.home.repo`): the
+   factory's GitHub App is private, and GitHub installs a private App only on
+   the account that owns it. Refuse other owners and explain why. Name each
    project after its repository in lower case.
 4. Models. Agent turns run Claude Code (`harness.kind: claude`). Ask for the
    model of work turns and of review turns; suggest `opus` and `sonnet`.

@@ -25,8 +25,8 @@ turn this clone into the user's private factory repository.
    | flux | `flux --version` | `brew install fluxcd/tap/flux` | `curl -s https://fluxcd.io/install.sh \| sudo bash` |
    | sops | `sops --version` | `brew install sops` | a release binary from https://github.com/getsops/sops/releases |
    | age | `age --version` | `brew install age` | `sudo apt-get install -y age` |
-   | node 22+ | `node --version` | `brew install node@22` | https://github.com/nodesource/distributions |
-   | pnpm | `pnpm --version` | `corepack enable pnpm` | `corepack enable pnpm` |
+   | node 22+ | `node --version` | `brew install node` | https://github.com/nodesource/distributions |
+   | pnpm | `pnpm --version` | `brew install pnpm` | `sudo npm install -g pnpm` |
    | jq | `jq --version` | `brew install jq` | `sudo apt-get install -y jq` |
    | curl | `curl --version` | built in | `sudo apt-get install -y curl` |
    | dig | `dig -v` | built in | `sudo apt-get install -y dnsutils` |
@@ -47,16 +47,17 @@ turn this clone into the user's private factory repository.
    owner type: `gh api users/<owner> -q .type` prints `User` or
    `Organization`.
 6. When `gh repo view <owner>/<name>` succeeds, the repository exists: ask
-   whether it is this factory (continue with it: set the remotes as in step 7
-   and `git pull --rebase origin main`) or another name should be used. Do
-   not push into an existing repository that is not this factory.
-7. Create the private copy:
+   whether it is this factory (an earlier, interrupted run created it; then
+   continue with step 7) or another name should be used. Do not push into an
+   existing repository that is not this factory.
+7. Create the private copy and point the remotes at it. Every line is safe to
+   run again after an interruption:
 
    ```bash
-   gh repo create <owner>/<name> --private --description "Software factory"
-   git remote rename origin upstream
-   git remote add origin https://github.com/<owner>/<name>.git
-   git push origin main
+   gh repo view <owner>/<name> >/dev/null 2>&1 || gh repo create <owner>/<name> --private --description "Software factory"
+   git remote get-url upstream >/dev/null 2>&1 || git remote rename origin upstream
+   git remote add origin https://github.com/<owner>/<name>.git 2>/dev/null || git remote set-url origin https://github.com/<owner>/<name>.git
+   if [ -z "$(git ls-remote origin main)" ]; then git push origin main; else git pull --rebase origin main; fi
    ```
 
 8. Write `.factory/state.json` (times in UTC from `date -u +%Y-%m-%dT%H:%M:%SZ`,
