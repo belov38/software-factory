@@ -13,7 +13,7 @@ App; the factory itself arrives in a later version.
 - A server with 4 CPU and 16 GB of memory (depends on your workload).
 - A host name in a domain you control, for example `factory.example.com`.
   You add its DNS A record when the installer asks: DNS only (in Cloudflare,
-  proxy off), and no AAAA record.
+  proxy off).
 - If your provider has a firewall in front of the server, it allows TCP 22,
   80 and 443.
 - A GitHub account, and the GitHub CLI logged in: `gh auth login`.
@@ -25,10 +25,8 @@ App; the factory itself arrives in a later version.
 ```bash
 git clone https://github.com/belov38/software-factory.git
 cd software-factory
-claude
+claude "install the factory"
 ```
-
-Then type: `install the factory`.
 
 The agent checks your machine and asks before installing missing tools. Your
 part:
@@ -43,7 +41,7 @@ part:
 4. Click "Create GitHub App" and then "Install" in the browser.
 5. Back up the age key file it names (for example in a password manager).
 
-If the session stops, run `claude` in the same directory again: the
-installation continues where it stopped.
+If the session stops, run `claude "install the factory"` in the same directory
+again: the installation continues where it stopped.
 
 Questions and problems: [Discussions](https://github.com/belov38/software-factory/discussions).
